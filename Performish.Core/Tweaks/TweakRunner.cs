@@ -146,7 +146,7 @@ namespace Performish.Core.Tweaks
             var run = new TweakRunResult { Tweak = tweak };
             try
             {
-                ctx.Log($"{(action == ChangeLogAction.Apply ? "Applying" : "Undoing")}: [{tweak.Id}] {tweak.Name}");
+                ctx.Log($"{(action == ChangeLogAction.Apply ? "Applying" : "Undoing")}: [{tweak.Id}] {tweak.Title}");
                 var result = action == ChangeLogAction.Apply ? tweak.Apply(ctx) : tweak.Undo(ctx);
                 run.Result = result;
 
@@ -154,7 +154,7 @@ namespace Performish.Core.Tweaks
                 {
                     TimestampUtc = DateTime.UtcNow,
                     TweakId = tweak.Id,
-                    TweakName = tweak.Name,
+                    TweakName = tweak.Title,
                     Action = action,
                     Outcome = result.Outcome,
                     Message = result.Message,
@@ -175,7 +175,7 @@ namespace Performish.Core.Tweaks
                 {
                     TimestampUtc = DateTime.UtcNow,
                     TweakId = tweak.Id,
-                    TweakName = tweak.Name,
+                    TweakName = tweak.Title,
                     Action = action,
                     Outcome = OperationOutcome.Failed,
                     Message = ex.Message,

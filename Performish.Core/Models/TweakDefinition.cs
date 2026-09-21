@@ -8,7 +8,14 @@ namespace Performish.Core.Models
     public sealed class TweakDefinition
     {
         public string Id { get; }
-        public string Name { get; }
+
+        /// <summary>Short, plain-language, action-led title shown everywhere a tweak is listed
+        /// (browser rows, confirm dialogs, change log, reports, results popup) - e.g. "Disable
+        /// advertising ID tracking". Never the Id, never code-style. Validated at load time by
+        /// TweakRegistry (non-empty, distinct from Id, unique across the library) - see
+        /// TweakRegistry.ValidateSchema.</summary>
+        public string Title { get; }
+
         public string Description { get; }
         public TweakCategory Category { get; }
         public RiskLevel Risk { get; }
@@ -32,7 +39,7 @@ namespace Performish.Core.Models
 
         public TweakDefinition(
             string id,
-            string name,
+            string title,
             string description,
             TweakCategory category,
             RiskLevel risk,
@@ -48,7 +55,7 @@ namespace Performish.Core.Models
             if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("Tweak id is required.", nameof(id));
 
             Id = id;
-            Name = name;
+            Title = title;
             Description = description;
             Category = category;
             Risk = risk;

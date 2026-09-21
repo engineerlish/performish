@@ -35,7 +35,7 @@ namespace Performish.Tests
         }
 
         [Fact]
-        public void EmptyName_ThrowsAndNamesTheTweak()
+        public void EmptyTitle_ThrowsAndNamesTheTweak()
         {
             var bad = new TweakDefinition("t.badname", "", "desc", TweakCategory.Debloat, RiskLevel.Safe,
                 TweakScope.CurrentUser, false, "source", _ => TweakState.Unknown,
@@ -44,7 +44,36 @@ namespace Performish.Tests
             var ex = Assert.Throws<InvalidOperationException>(() => new TweakRegistry(new[] { bad }));
 
             Assert.Contains("t.badname", ex.Message);
-            Assert.Contains("Name", ex.Message);
+            Assert.Contains("Title", ex.Message);
+        }
+
+        [Fact]
+        public void TitleEqualToId_ThrowsAndExplainsWhy()
+        {
+            var bad = new TweakDefinition("t.sameastitle", "t.sameastitle", "desc", TweakCategory.Debloat, RiskLevel.Safe,
+                TweakScope.CurrentUser, false, "source", _ => TweakState.Unknown,
+                _ => TweakOperationResult.Success("ok"), _ => TweakOperationResult.Skipped("n/a"));
+
+            var ex = Assert.Throws<InvalidOperationException>(() => new TweakRegistry(new[] { bad }));
+
+            Assert.Contains("t.sameastitle", ex.Message);
+            Assert.Contains("same as the Id", ex.Message);
+        }
+
+        [Fact]
+        public void DuplicateTitle_ThrowsAndNamesBothTweaks()
+        {
+            var bad1 = new TweakDefinition("t.dup1", "Duplicate Title", "desc", TweakCategory.Debloat, RiskLevel.Safe,
+                TweakScope.CurrentUser, false, "source", _ => TweakState.Unknown,
+                _ => TweakOperationResult.Success("ok"), _ => TweakOperationResult.Skipped("n/a"));
+            var bad2 = new TweakDefinition("t.dup2", "Duplicate Title", "desc", TweakCategory.Debloat, RiskLevel.Safe,
+                TweakScope.CurrentUser, false, "source", _ => TweakState.Unknown,
+                _ => TweakOperationResult.Success("ok"), _ => TweakOperationResult.Skipped("n/a"));
+
+            var ex = Assert.Throws<InvalidOperationException>(() => new TweakRegistry(new[] { bad1, bad2 }));
+
+            Assert.Contains("t.dup1", ex.Message);
+            Assert.Contains("t.dup2", ex.Message);
         }
 
         [Fact]

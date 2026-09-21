@@ -18,7 +18,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.RegistryDword(
                 "perf.visual_fx_best_performance",
-                "Set visual effects to \"Best performance\"",
+                "Set visual effects for best performance",
                 "Equivalent to System Properties > Performance Options > Adjust for best performance - " +
                 "turns off Windows's decorative animations/shadows/fades as a single documented switch.",
                 TweakCategory.Performance, RiskLevel.Safe, TweakScope.CurrentUser, false,
@@ -37,7 +37,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.RegistryString(
                 "perf.menu_show_delay",
-                "Remove the menu/tooltip open delay",
+                "Remove menu and tooltip delay",
                 "Sets the delay before a menu expands to 0ms (default 400ms) - snappier navigation, " +
                 "no visual effect disabled, purely a wait timer.",
                 TweakCategory.Performance, RiskLevel.Safe, TweakScope.CurrentUser, false,
@@ -66,7 +66,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.RegistryDword(
                 "perf.fast_startup_enable",
-                "Ensure Fast Startup is on",
+                "Turn on Fast Startup",
                 "Explicitly enables hybrid boot (hiberboot) in case an OEM image shipped with it off - " +
                 "shortens cold boot time. Has no effect on sleep/hibernate itself.",
                 TweakCategory.Performance, RiskLevel.Safe, TweakScope.Machine, true,
@@ -87,7 +87,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.ServiceStartMode(
                 "perf.search_indexer_manual",
-                "Set Windows Search to Manual start",
+                "Set Windows Search to manual start",
                 "Search still works on demand, it just doesn't index continuously in the background. " +
                 "Start-menu/File Explorer search becomes slower on the first query after boot.",
                 TweakCategory.Performance, RiskLevel.Moderate, TweakScope.Machine, false,
@@ -97,7 +97,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.ServiceStartMode(
                 "perf.sysmain_disable",
-                "Disable SysMain (Superfetch)",
+                "Disable Superfetch memory pre-loading",
                 "Stops the service that preloads frequently-used apps into RAM. Commonly recommended " +
                 "off on SSDs with ample RAM; can help on some systems and do nothing on others.",
                 TweakCategory.Performance, RiskLevel.Moderate, TweakScope.Machine, false,
@@ -107,7 +107,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.ServiceStartMode(
                 "perf.diagtrack_disable",
-                "Disable the Connected User Experiences and Telemetry service",
+                "Stop the telemetry tracking service",
                 "Stops the DiagTrack service, which collects and uploads diagnostic data in the " +
                 "background. Complements the diagnostic-data-collection policy tweak.",
                 TweakCategory.Performance, RiskLevel.Moderate, TweakScope.Machine, false,
@@ -150,7 +150,7 @@ namespace Performish.Core.Tweaks
             }
 
             return new TweakDefinition(
-                "perf.power_high_performance", "Switch to the \"High performance\" power plan",
+                "perf.power_high_performance", "Switch to High Performance power plan",
                 "Windows's built-in maximum-performance plan - higher idle power draw and heat, " +
                 "shorter battery life on laptops than Balanced.",
                 TweakCategory.Performance, RiskLevel.Moderate, TweakScope.Machine, false,
@@ -197,7 +197,7 @@ namespace Performish.Core.Tweaks
             }
 
             return new TweakDefinition(
-                "perf.power_ultimate_performance", "Switch to the \"Ultimate Performance\" power plan",
+                "perf.power_ultimate_performance", "Switch to Ultimate Performance power plan",
                 "Removes remaining micro-latency power-saving parks Windows applies even under High " +
                 "performance. Desktop-recommended: on a laptop this meaningfully shortens battery life " +
                 "for a gain that is rarely perceptible outside of benchmarks.",

@@ -10,11 +10,11 @@ namespace Performish.Tests
     public class TweakRunnerTests
     {
         private static TweakDefinition MakeRegistryTweak(string id, RiskLevel risk = RiskLevel.Safe) =>
-            TweakFactory.RegistryDword(id, id, "desc", TweakCategory.Debloat, risk, TweakScope.CurrentUser, false, "source",
+            TweakFactory.RegistryDword(id, $"Test tweak {id}", "desc", TweakCategory.Debloat, risk, TweakScope.CurrentUser, false, "source",
                 RegistryHive.CurrentUser, @"Software\Test", id, 1);
 
         private static TweakDefinition MakeAlwaysThrowingTweak(string id) => new TweakDefinition(
-            id, id, "desc", TweakCategory.Debloat, RiskLevel.Safe, TweakScope.CurrentUser, false, "source",
+            id, $"Test throwing tweak {id}", "desc", TweakCategory.Debloat, RiskLevel.Safe, TweakScope.CurrentUser, false, "source",
             _ => TweakState.Unknown,
             _ => throw new InvalidOperationException("boom"),
             _ => TweakOperationResult.Skipped("n/a"));

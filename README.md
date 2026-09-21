@@ -10,6 +10,10 @@ workstation or gaming PC for better performance and efficiency.
   settings so you know what's on it before changing anything.
 - **Health score** - a simple, at-a-glance score for how "clean" your
   system currently is.
+- **Plain-language options** - every change has a short, clear title
+  describing what it does, with the full explanation (what changes, why
+  it helps, risk level, whether a reboot or admin rights are needed, and
+  what undoing it does) one click away.
 - **Debloat options** - remove or disable unwanted preinstalled apps,
   background services, ads and suggestions, and other clutter, with a
   clear description and risk level for each one.

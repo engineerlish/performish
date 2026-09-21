@@ -18,7 +18,7 @@ namespace Performish.Core.Tweaks
         /// <summary>A tweak whose "applied" state is exactly one DWORD registry value equaling
         /// <paramref name="desiredValue"/>. Apply snapshots the prior value/absence for Undo.</summary>
         public static TweakDefinition RegistryDword(
-            string id, string name, string description, TweakCategory category, RiskLevel risk,
+            string id, string title, string description, TweakCategory category, RiskLevel risk,
             TweakScope scope, bool rebootRequired, string source,
             RegistryHive hive, string subKeyPath, string valueName, int desiredValue,
             Preset[] presets = null, bool isProtected = false)
@@ -55,7 +55,7 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(description2);
             }
 
-            return new TweakDefinition(id, name, description, category, risk, scope, rebootRequired, source,
+            return new TweakDefinition(id, title, description, category, risk, scope, rebootRequired, source,
                 Check, Apply, Undo, presets, isProtected);
         }
 
@@ -65,7 +65,7 @@ namespace Performish.Core.Tweaks
         /// delays, some Explorer settings) that Windows still stores as a string of digits rather
         /// than a real DWORD.</summary>
         public static TweakDefinition RegistryString(
-            string id, string name, string description, TweakCategory category, RiskLevel risk,
+            string id, string title, string description, TweakCategory category, RiskLevel risk,
             TweakScope scope, bool rebootRequired, string source,
             RegistryHive hive, string subKeyPath, string valueName, string desiredValue,
             Preset[] presets = null, bool isProtected = false)
@@ -102,14 +102,14 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(descr);
             }
 
-            return new TweakDefinition(id, name, description, category, risk, scope, rebootRequired, source,
+            return new TweakDefinition(id, title, description, category, risk, scope, rebootRequired, source,
                 Check, Apply, Undo, presets, isProtected);
         }
 
         // ---- Service start mode ------------------------------------------------------------------
 
         public static TweakDefinition ServiceStartMode(
-            string id, string name, string description, TweakCategory category, RiskLevel risk,
+            string id, string title, string description, TweakCategory category, RiskLevel risk,
             TweakScope scope, bool rebootRequired, string source,
             string serviceName, System.ServiceProcess.ServiceStartMode desiredMode, bool stopWhenDisabling = true,
             Preset[] presets = null, bool isProtected = false)
@@ -150,14 +150,14 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(descr);
             }
 
-            return new TweakDefinition(id, name, description, category, risk, scope, rebootRequired, source,
+            return new TweakDefinition(id, title, description, category, risk, scope, rebootRequired, source,
                 Check, Apply, Undo, presets, isProtected);
         }
 
         // ---- Scheduled task enable/disable -------------------------------------------------------
 
         public static TweakDefinition ScheduledTask(
-            string id, string name, string description, TweakCategory category, RiskLevel risk,
+            string id, string title, string description, TweakCategory category, RiskLevel risk,
             TweakScope scope, bool rebootRequired, string source,
             string taskPath, bool desiredEnabled,
             Preset[] presets = null, bool isProtected = false)
@@ -196,7 +196,7 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(descr);
             }
 
-            return new TweakDefinition(id, name, description, category, risk, scope, rebootRequired, source,
+            return new TweakDefinition(id, title, description, category, risk, scope, rebootRequired, source,
                 Check, Apply, Undo, presets, isProtected);
         }
 
@@ -210,7 +210,7 @@ namespace Performish.Core.Tweaks
         /// silently no-op'ing. Check() is always NotApplicable for the same reason a completed action
         /// (not a persistent state) has no "is this currently applied" meaning.</summary>
         public static TweakDefinition SpaceCleanup(
-            string id, string name, string description, TweakCategory category, RiskLevel risk, string source,
+            string id, string title, string description, TweakCategory category, RiskLevel risk, string source,
             Func<string[]> resolvePaths, int olderThanDays,
             Preset[] presets = null, bool isProtected = false)
         {
@@ -242,7 +242,7 @@ namespace Performish.Core.Tweaks
                 TweakOperationResult.Skipped("Deleted files cannot be restored - there is nothing to undo. " +
                     $"This tweak only ever deletes files older than {olderThanDays} day(s) under its documented target folder(s).");
 
-            return new TweakDefinition(id, name, description, category, risk, TweakScope.CurrentUser, false, source,
+            return new TweakDefinition(id, title, description, category, risk, TweakScope.CurrentUser, false, source,
                 _ => TweakState.NotApplicable, Apply, Undo, presets, isProtected);
         }
 
@@ -255,7 +255,7 @@ namespace Performish.Core.Tweaks
         /// silently misreporting state. Apply/Undo carry no live queryable state to snapshot -
         /// the undo command is the fixed inverse of the apply command, defined up front.</summary>
         public static TweakDefinition ProcessCommandPair(
-            string id, string name, string description, TweakCategory category, RiskLevel risk,
+            string id, string title, string description, TweakCategory category, RiskLevel risk,
             TweakScope scope, bool rebootRequired, string source,
             string applyFileName, string applyArguments,
             string undoFileName, string undoArguments,
@@ -283,14 +283,14 @@ namespace Performish.Core.Tweaks
                     : TweakOperationResult.Failed($"{descr} - exit code {result.ExitCode}: {result.StandardError}");
             }
 
-            return new TweakDefinition(id, name, description, category, risk, scope, rebootRequired, source,
+            return new TweakDefinition(id, title, description, category, risk, scope, rebootRequired, source,
                 _ => TweakState.Unknown, Apply, Undo, presets, isProtected);
         }
 
         // ---- Appx removal (per-user + deprovision) ------------------------------------------------
 
         public static TweakDefinition AppxRemove(
-            string id, string name, string description, TweakCategory category, RiskLevel risk,
+            string id, string title, string description, TweakCategory category, RiskLevel risk,
             string source, string packageFamilyPrefix, bool alsoDeprovision = true,
             Preset[] presets = null, bool isProtected = false)
         {
@@ -332,7 +332,7 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(descr);
             }
 
-            return new TweakDefinition(id, name, description, category, risk, TweakScope.CurrentUser, false, source,
+            return new TweakDefinition(id, title, description, category, risk, TweakScope.CurrentUser, false, source,
                 Check, Apply, Undo, presets, isProtected);
         }
     }

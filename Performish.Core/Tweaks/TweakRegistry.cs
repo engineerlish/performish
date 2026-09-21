@@ -31,12 +31,32 @@ namespace Performish.Core.Tweaks
         {
             var errors = new List<string>();
 
+            var titleOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // title -> first tweak id that used it
+
             foreach (var t in _tweaks)
             {
                 var label = string.IsNullOrWhiteSpace(t.Id) ? "(tweak with no id)" : t.Id;
 
                 if (string.IsNullOrWhiteSpace(t.Id)) errors.Add($"{label}: Id is null/empty.");
-                if (string.IsNullOrWhiteSpace(t.Name)) errors.Add($"{label}: Name is null/empty.");
+
+                if (string.IsNullOrWhiteSpace(t.Title))
+                {
+                    errors.Add($"{label}: Title is null/empty - every tweak needs a plain-language, " +
+                        "action-led title (e.g. \"Disable advertising ID tracking\"), not just an id.");
+                }
+                else
+                {
+                    if (string.Equals(t.Title.Trim(), t.Id.Trim(), StringComparison.OrdinalIgnoreCase))
+                        errors.Add($"{label}: Title is the same as the Id (\"{t.Title}\") - the title must be a " +
+                            "human-readable label, not the internal identifier.");
+
+                    if (titleOwners.TryGetValue(t.Title.Trim(), out var firstOwner))
+                        errors.Add($"{label}: Title \"{t.Title}\" is already used by tweak \"{firstOwner}\" - " +
+                            "titles must be unique so users can tell tweaks apart.");
+                    else
+                        titleOwners[t.Title.Trim()] = t.Id;
+                }
+
                 if (string.IsNullOrWhiteSpace(t.Description)) errors.Add($"{label}: Description is null/empty.");
                 if (string.IsNullOrWhiteSpace(t.Source)) errors.Add($"{label}: Source is null/empty.");
 

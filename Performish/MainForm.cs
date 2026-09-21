@@ -318,7 +318,7 @@ namespace Performish
             };
             foreach (var t in selection.OrderBy(t => t.Risk))
             {
-                lines.Add(($"[{UiStyle.RiskTag(t.Risk)}] {t.Name}", UiStyle.ColorForRisk(t.Risk)));
+                lines.Add(($"[{UiStyle.RiskTag(t.Risk)}] {t.Title}", UiStyle.ColorForRisk(t.Risk)));
                 lines.Add(($"    {t.Description}", UiStyle.Dim));
                 if (t.RebootRequired) lines.Add(("    Requires a reboot to fully take effect.", UiStyle.GradientMid));
             }
@@ -389,7 +389,7 @@ namespace Performish
             {
                 ($"{toRevert.Count} tweak(s) will be undone:", UiStyle.Error)
             };
-            foreach (var t in toRevert) lines.Add(($"  {t.Name}", UiStyle.Foreground));
+            foreach (var t in toRevert) lines.Add(($"  {t.Title}", UiStyle.Foreground));
             lines.Add(("", UiStyle.Foreground));
             lines.Add(($"Mode: {(DryRun ? "DRY RUN (nothing will actually change)" : "REAL - these changes will be reverted")}",
                 DryRun ? UiStyle.BrightAccent : UiStyle.Error));
@@ -445,7 +445,7 @@ namespace Performish
                 ($"{drifted.Count} tweak(s) were applied by Performish but no longer check out as applied - " +
                     "something (a Windows Update, a Group Policy refresh, or manual change) reverted them:", UiStyle.GradientMid)
             };
-            foreach (var t in drifted) lines.Add(($"  {t.Name}", UiStyle.Foreground));
+            foreach (var t in drifted) lines.Add(($"  {t.Title}", UiStyle.Foreground));
             lines.Add(("", UiStyle.Foreground));
             lines.Add(($"Mode: {(DryRun ? "DRY RUN (nothing will actually change)" : "REAL - these will be reapplied")}",
                 DryRun ? UiStyle.BrightAccent : UiStyle.Error));

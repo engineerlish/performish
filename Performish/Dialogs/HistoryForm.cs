@@ -161,7 +161,7 @@ namespace Performish.Dialogs
             var dryRun = _getDryRun();
             var lines = new[]
             {
-                ($"Undo just this one tweak: {tweak.Name}", UiStyle.Foreground),
+                ($"Undo just this one tweak: {tweak.Title}", UiStyle.Foreground),
                 ($"    {tweak.Description}", UiStyle.Dim),
                 ("", UiStyle.Foreground),
                 ($"Mode: {(dryRun ? "DRY RUN (nothing will actually change)" : "REAL - this will be reverted")}",

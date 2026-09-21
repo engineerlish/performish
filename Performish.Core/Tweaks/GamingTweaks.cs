@@ -34,7 +34,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.RegistryDword(
                 "gaming.game_dvr_policy_disable",
-                "Disable Game DVR at the policy level",
+                "Block Game DVR at the system level",
                 "Machine-wide policy backing the per-user Game DVR toggle, so it can't be silently " +
                 "re-enabled by a per-user setting change or an app.",
                 TweakCategory.Gaming, RiskLevel.Moderate, TweakScope.Machine, false,
@@ -44,7 +44,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.RegistryDword(
                 "gaming.game_bar_startup_panel_disable",
-                "Stop the Game Bar \"welcome\" panel from popping up",
+                "Stop the Game Bar welcome popup",
                 "Suppresses the \"Do you want to open Xbox Game Bar?\" prompt Windows shows the first " +
                 "time it detects a full-screen app. Game Bar itself, and Game Mode, are unaffected.",
                 TweakCategory.Gaming, RiskLevel.Safe, TweakScope.CurrentUser, false,
@@ -65,7 +65,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.ServiceStartMode(
                 "gaming.xbox_networking_manual",
-                "Set Xbox Live Networking Service to Manual start",
+                "Delay the Xbox networking service",
                 "Still starts on demand when a game needs it; stops it idling in the background between " +
                 "sessions. Xbox Game Bar, Game Mode, and controller support are unaffected.",
                 TweakCategory.Gaming, RiskLevel.Safe, TweakScope.Machine, false,
@@ -75,7 +75,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.ServiceStartMode(
                 "gaming.xbox_live_auth_manual",
-                "Set Xbox Live Auth Manager to Manual start",
+                "Delay the Xbox sign-in service",
                 "Same idea as the Xbox networking service tweak - on-demand instead of always running.",
                 TweakCategory.Gaming, RiskLevel.Safe, TweakScope.Machine, false,
                 "sc.exe config XblAuthManager",
@@ -130,7 +130,7 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(descr);
             }
 
-            return new TweakDefinition(id, "Turn off fullscreen optimizations by default",
+            return new TweakDefinition(id, "Turn off fullscreen optimizations",
                 "Some games render measurably better in true exclusive fullscreen than under Windows's " +
                 "compositor-managed \"fullscreen optimizations\". This changes the system default; any " +
                 "individual game can still be overridden per-title.",
@@ -183,7 +183,7 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(descr);
             }
 
-            return new TweakDefinition(id, "Disable mouse acceleration (\"Enhance pointer precision\")",
+            return new TweakDefinition(id, "Disable mouse pointer acceleration",
                 "Windows's non-linear mouse acceleration curve makes aim inconsistent at different " +
                 "movement speeds - most competitive players turn it off in favor of a flat sensitivity.",
                 TweakCategory.Gaming, RiskLevel.Safe, TweakScope.CurrentUser, false,

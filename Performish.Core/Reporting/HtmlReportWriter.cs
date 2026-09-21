@@ -79,15 +79,15 @@ namespace Performish.Core.Reporting
             var failed = data.BatchResults.Count(r => r.Failed);
             sb.Append("<h2>Batch result" + (data.WasDryRun ? " (dry run)" : "") + "</h2>");
             sb.Append($"<p>{succeeded} succeeded, {failed} failed, {data.BatchResults.Count} total.</p>");
-            sb.Append("<table><tr><th>Id</th><th>Name</th><th>Outcome</th><th>Message</th></tr>");
+            sb.Append("<table><tr><th>Title</th><th>Outcome</th><th>Message</th><th class=\"dim\">Id</th></tr>");
             foreach (var r in data.BatchResults)
             {
                 var cssClass = r.Failed ? "err" : "accent";
                 sb.Append("<tr>");
-                sb.Append($"<td class=\"dim\">{Escape(r.Tweak.Id)}</td>");
-                sb.Append($"<td>{Escape(r.Tweak.Name)}</td>");
+                sb.Append($"<td>{Escape(r.Tweak.Title)}</td>");
                 sb.Append($"<td class=\"{cssClass}\">{Escape(r.Result?.Outcome.ToString() ?? "Failed")}</td>");
                 sb.Append($"<td class=\"dim\">{Escape(r.Result?.Message ?? r.Exception?.Message ?? "")}</td>");
+                sb.Append($"<td class=\"dim\">{Escape(r.Tweak.Id)}</td>");
                 sb.Append("</tr>");
             }
             sb.Append("</table>");

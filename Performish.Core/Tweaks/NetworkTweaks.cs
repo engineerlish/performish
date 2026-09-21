@@ -15,7 +15,7 @@ namespace Performish.Core.Tweaks
         {
             yield return TweakFactory.RegistryDword(
                 "net.throttling_disable",
-                "Disable network throttling for multimedia/games",
+                "Disable network throttling during gaming",
                 "Removes the ~10-packets-per-ms cap Windows applies to non-multimedia network traffic " +
                 "during multimedia playback/gaming, which can otherwise add jitter to game traffic " +
                 "sharing the connection with other apps.",
@@ -25,7 +25,7 @@ namespace Performish.Core.Tweaks
 
             yield return TweakFactory.RegistryDword(
                 "net.system_responsiveness",
-                "Prioritize multimedia/game threads over background tasks",
+                "Prioritize game threads over background tasks",
                 "Lowers SystemResponsiveness from the 20% default to 0%, giving multimedia/game-class " +
                 "threads a larger share of CPU time versus background work under load.",
                 TweakCategory.Network, RiskLevel.Moderate, TweakScope.Machine, false,
@@ -88,7 +88,7 @@ namespace Performish.Core.Tweaks
                 return TweakOperationResult.Success(descr);
             }
 
-            return new TweakDefinition(id, "Disable Nagle's algorithm on all network adapters",
+            return new TweakDefinition(id, "Disable Nagle's algorithm for lower latency",
                 "Nagle's algorithm batches small outgoing packets to reduce overhead, at the cost of " +
                 "up to ~200ms added latency per batched send - noticeable in some multiplayer games. " +
                 "Disabling it trades a small amount of network efficiency for lower latency.",

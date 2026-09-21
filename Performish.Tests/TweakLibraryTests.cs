@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Performish.Core.Models;
 using Performish.Core.Backup;
@@ -43,15 +44,53 @@ namespace Performish.Tests
         }
 
         [Fact]
-        public void EveryTweak_HasNameDescriptionAndSource()
+        public void EveryTweak_HasTitleDescriptionAndSource()
         {
             var registry = TweakRegistry.BuildDefault();
             foreach (var t in registry.All)
             {
-                Assert.False(string.IsNullOrWhiteSpace(t.Name), $"{t.Id} has no name.");
+                Assert.False(string.IsNullOrWhiteSpace(t.Title), $"{t.Id} has no title.");
                 Assert.False(string.IsNullOrWhiteSpace(t.Description), $"{t.Id} has no description.");
                 Assert.False(string.IsNullOrWhiteSpace(t.Source), $"{t.Id} has no source/justification.");
             }
+        }
+
+        [Fact]
+        public void EveryTweak_TitleIsPlainLanguage_NotIdStyle()
+        {
+            var registry = TweakRegistry.BuildDefault();
+            foreach (var t in registry.All)
+            {
+                Assert.DoesNotContain("_", t.Title);
+                Assert.DoesNotContain(".", t.Title);
+                Assert.NotEqual(t.Id, t.Title);
+                // Sentence case: starts with an uppercase letter, not a lowercase identifier fragment.
+                Assert.True(char.IsUpper(t.Title[0]), $"{t.Id}: title \"{t.Title}\" should start with a capital letter.");
+            }
+        }
+
+        [Fact]
+        public void EveryTweak_TitleIsAAppropriateLength()
+        {
+            var registry = TweakRegistry.BuildDefault();
+            foreach (var t in registry.All)
+            {
+                var wordCount = t.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+                Assert.InRange(wordCount, 2, 10); // "about 3 to 8 words" with a little slack either side
+            }
+        }
+
+        [Fact]
+        public void AllTweakTitles_AreUniqueAcrossTheLibrary()
+        {
+            var registry = TweakRegistry.BuildDefault();
+            var duplicates = registry.All
+                .GroupBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            Assert.Empty(duplicates);
         }
 
         [Fact]
