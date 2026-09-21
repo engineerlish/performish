@@ -1,0 +1,51 @@
+# Build artifacts and caches
+bin/
+obj/
+*.user
+*.suo
+*.cache
+.vs/
+.idea/
+.vscode/
+
+# Dependency / environment folders
+node_modules/
+.venv/
+venv/
+packages/
+
+# Logs, backups, restore-point data, generated reports/benchmarks
+*.log
+logs/
+backups/
+changelog/
+exports/
+*-report.html
+*-changelog.csv
+performish-report-*.html
+performish-changelog-*.csv
+
+# Temp / local / machine-specific files
+*.tmp
+*.bak
+*~
+Thumbs.db
+desktop.ini
+*.local.json
+appsettings.local.json
+.env
+.env.*
+
+# Internal working/process documentation - kept on disk, not published
+PROGRESS.md
+DECISIONS.md
+ROADMAP.md
+CONVENTIONS.md
+BASELINE.md
+PERFORMANCE_REPORT.md
+TESTING.md
+CHANGELOG.md
+CLAUDE.md
+*.prompt.md
+.agent/
+.claude/

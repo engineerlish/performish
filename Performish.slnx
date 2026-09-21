@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Performish.Core/Performish.Core.csproj" />
+  <Project Path="Performish.Tests/Performish.Tests.csproj" />
+  <Project Path="Performish/Performish.csproj" />
+</Solution>

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Performish.Core</RootNamespace>
+    <AssemblyName>Performish.Core</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Version>1.0.0</Version>
+    <!-- Needs the Windows TFM (not plain net10.0) for System.Management/registry/service-controller
+         APIs used by the real backends, but pulls in no WinForms/UI reference of its own - all logic
+         here is unit-testable in isolation, see DECISIONS.md. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.0" />
+    <PackageReference Include="System.Management" Version="9.0.0" />
+  </ItemGroup>
+</Project>
