@@ -274,6 +274,33 @@ namespace Performish.Dialogs
             _reviewButton.Enabled = _selectedIds.Count > 0;
         }
 
+        /// <summary>How many characters of the title the list row has room for before it must be
+        /// truncated - the row is a fixed-width monospace layout (risk tag, title, state, scope), so a
+        /// character count is an exact width, not an approximation. The full, untruncated title is
+        /// always still shown in the detail pane below.</summary>
+        public const int TitleColumnWidth = 56;
+
+        /// <summary>Builds the exact row text for a tweak, placeholder-safe and truncated - pulled out
+        /// of ListOnDrawItem so tests can assert on it directly without driving a real owner-draw paint
+        /// event. Never shows the type name or the raw id; an empty/missing title shows
+        /// TweakDefinition.UntitledPlaceholder instead of falling back silently.</summary>
+        public static string BuildRowText(TweakDefinition tweak, TweakState state)
+        {
+            var title = string.IsNullOrWhiteSpace(tweak.Title) ? TweakDefinition.UntitledPlaceholder : tweak.Title;
+            if (title.Length > TitleColumnWidth) title = title.Substring(0, TitleColumnWidth - 1) + "…";
+
+            var stateText = state switch
+            {
+                TweakState.Applied => "applied",
+                TweakState.NotApplied => "not applied",
+                TweakState.NotApplicable => "n/a",
+                _ => "unknown"
+            };
+
+            return $"[{UiStyle.RiskTag(tweak.Risk),-8}] {title,-TitleColumnWidth} {stateText,-12} {tweak.Scope}" +
+                (tweak.RebootRequired ? "  (reboot)" : "");
+        }
+
         private void ListOnDrawItem(object sender, DrawItemEventArgs e)
         {
             if (e.Index < 0 || e.Index >= _visibleTweaks.Count) return;
@@ -289,16 +316,7 @@ namespace Performish.Dialogs
                 (isChecked ? ButtonState.Checked : ButtonState.Normal) | ButtonState.Flat);
 
             var state = _stateCache.TryGetValue(tweak.Id, out var cached) ? cached : TweakState.Unknown;
-            var stateText = state switch
-            {
-                TweakState.Applied => "applied",
-                TweakState.NotApplied => "not applied",
-                TweakState.NotApplicable => "n/a",
-                _ => "unknown"
-            };
-
-            var text = $"[{UiStyle.RiskTag(tweak.Risk),-8}] {tweak.Title,-56} {stateText,-12} {tweak.Scope}" +
-                (tweak.RebootRequired ? "  (reboot)" : "");
+            var text = BuildRowText(tweak, state);
 
             using var textBrush = new SolidBrush(UiStyle.ColorForRisk(tweak.Risk));
             e.Graphics.DrawString(text, e.Font ?? UiStyle.Mono, textBrush, checkRect.Right + 8, e.Bounds.Y + 3);
@@ -320,7 +338,7 @@ namespace Performish.Dialogs
             }
 
             var t = _visibleTweaks[_list.SelectedIndex];
-            AppendDetail(t.Title, UiStyle.BrightAccent);
+            AppendDetail(string.IsNullOrWhiteSpace(t.Title) ? TweakDefinition.UntitledPlaceholder : t.Title, UiStyle.BrightAccent);
             AppendDetail(t.Description, UiStyle.Foreground);
             AppendDetail("", UiStyle.Foreground);
             AppendDetail($"Risk: {UiStyle.RiskTag(t.Risk)}   Scope: {t.Scope}   " +

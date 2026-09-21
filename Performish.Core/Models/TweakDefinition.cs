@@ -7,6 +7,12 @@ namespace Performish.Core.Models
     /// harness never need to change. This is the "tweaks as data" architecture the task requires.</summary>
     public sealed class TweakDefinition
     {
+        /// <summary>Shown instead of a blank string anywhere a title would otherwise render empty -
+        /// TweakRegistry.ValidateSchema already refuses to load a tweak with no title, so this is a
+        /// last-resort safety net for a TweakDefinition built outside the registry (tests, a future
+        /// call site), never something a user should see in the shipped app.</summary>
+        public const string UntitledPlaceholder = "[Untitled tweak]";
+
         public string Id { get; }
 
         /// <summary>Short, plain-language, action-led title shown everywhere a tweak is listed
@@ -68,5 +74,11 @@ namespace Performish.Core.Models
             IncludedInPresets = includedInPresets ?? Array.Empty<Preset>();
             Protected = isProtected;
         }
+
+        /// <summary>Safety net only - every display path in the app reads `.Title` (or the
+        /// placeholder-aware helper) explicitly, never relies on this. Exists so that if a control
+        /// ever falls back to an item's default string conversion (e.g. a list that loses its
+        /// owner-draw handler), a user sees a plain-language title instead of the CLR type name.</summary>
+        public override string ToString() => string.IsNullOrWhiteSpace(Title) ? UntitledPlaceholder : Title;
     }
 }

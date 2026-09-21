@@ -100,6 +100,101 @@ namespace Performish.Tests
             Assert.Equal(2, form.SelectedIds.Count);
         }
 
+        // ---- Part 1 regression: list rows must never show the type name or a raw id ----------------
+
+        [StaFact]
+        public void TweakBrowser_EveryVisibleTweak_RowTextShowsTitleNeverTypeNameOrRawId()
+        {
+            var services = FakeServices();
+            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
+            form.Show();
+
+            Assert.NotEmpty(form.VisibleTweaks);
+            foreach (var tweak in form.VisibleTweaks)
+            {
+                var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
+                Assert.DoesNotContain("Performish.Core.Models", rowText);
+                Assert.DoesNotContain("TweakDefinition", rowText);
+                Assert.DoesNotContain(tweak.Id, rowText);
+                Assert.Contains(tweak.Title, rowText);
+            }
+        }
+
+        [StaFact]
+        public void TweakBrowser_EveryCategoryAndSearchResult_RowsContainNoTypeNameOrRawId()
+        {
+            var services = FakeServices();
+            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
+            form.Show();
+
+            void AssertCurrentViewIsClean()
+            {
+                Assert.NotEmpty(form.VisibleTweaks);
+                foreach (var tweak in form.VisibleTweaks)
+                {
+                    var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
+                    Assert.DoesNotContain("Performish.Core.Models", rowText);
+                    Assert.DoesNotContain(tweak.Id, rowText);
+                }
+            }
+
+            foreach (var category in new TweakCategory?[]
+                     { null, TweakCategory.Debloat, TweakCategory.Performance, TweakCategory.Gaming,
+                       TweakCategory.Network, TweakCategory.Maintenance })
+            {
+                form.ClickCategory(category);
+                AssertCurrentViewIsClean();
+            }
+
+            form.ClickCategory(null);
+            form.SetSearchText("disable");
+            AssertCurrentViewIsClean();
+        }
+
+        [Fact]
+        public void TweakDefinition_ToString_ReturnsTitleNeverTheTypeName()
+        {
+            var tweak = new TweakDefinition("t1", "Disable something", "desc", TweakCategory.Debloat,
+                RiskLevel.Safe, TweakScope.CurrentUser, false, "source",
+                _ => TweakState.Unknown, _ => TweakOperationResult.Success("ok"), _ => TweakOperationResult.Skipped("n/a"));
+
+            Assert.Equal("Disable something", tweak.ToString());
+        }
+
+        [Fact]
+        public void TweakDefinition_EmptyTitle_ToStringShowsPlaceholder_NotBlankOrTypeName()
+        {
+            // Bypasses TweakRegistry (which refuses to load an empty title) to prove the display-layer
+            // safety net holds even for a TweakDefinition built directly.
+            var tweak = new TweakDefinition("t1", "", "desc", TweakCategory.Debloat,
+                RiskLevel.Safe, TweakScope.CurrentUser, false, "source",
+                _ => TweakState.Unknown, _ => TweakOperationResult.Success("ok"), _ => TweakOperationResult.Skipped("n/a"));
+
+            Assert.Equal("[Untitled tweak]", tweak.ToString());
+            Assert.Equal("[Untitled tweak]", TweakDefinition.UntitledPlaceholder);
+
+            var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
+            Assert.Contains("[Untitled tweak]", rowText);
+            Assert.DoesNotContain("Performish.Core.Models", rowText);
+        }
+
+        [Fact]
+        public void TweakBrowser_LongTitle_IsTruncatedWithEllipsis_NotWrapped()
+        {
+            var longTitle = "Disable the extremely long and verbose setting that goes on for a very long time indeed";
+            Assert.True(longTitle.Length > TweakBrowserForm.TitleColumnWidth);
+
+            var tweak = new TweakDefinition("t1", longTitle, "desc", TweakCategory.Debloat,
+                RiskLevel.Safe, TweakScope.CurrentUser, false, "source",
+                _ => TweakState.Unknown, _ => TweakOperationResult.Success("ok"), _ => TweakOperationResult.Skipped("n/a"));
+
+            var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
+
+            Assert.Contains("…", rowText); // ellipsis, not a wrapped/multi-line title
+            Assert.DoesNotContain(longTitle, rowText); // the full title must not appear un-truncated
+            Assert.DoesNotContain("\n", rowText);
+        }
+
         [StaFact]
         public void ConfirmDialog_ClickingConfirm_SetsConfirmedTrueAndDialogResultOk()
         {
