@@ -171,11 +171,7 @@ namespace Performish.Dialogs
             var confirmed = ConfirmDialogForm.Show(this, "Undo this tweak", lines, "Undo", "Cancel");
             if (!confirmed) return;
 
-            await RunningForm.RunAsync(this, "Undoing", (token, onLog) => Task.Run(() =>
-            {
-                var ctx = _services.CreateContext(dryRun, onLog);
-                return _services.Runner.UndoBatch(new[] { tweak }, ctx, token);
-            }));
+            await RunningForm.RunAsync(this, "Undoing", _services, new[] { tweak }, ChangeLogAction.Undo, dryRun);
 
             RefreshList();
         }

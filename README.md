@@ -28,6 +28,9 @@ workstation or gaming PC for better performance and efficiency.
   applied.
 - **Undo and revert** - undo an individual change or revert everything
   in one click.
+- **Clear results** - after applying changes, see at a glance what
+  succeeded, what failed, and what was skipped, with failures shown
+  first, a short reason for each, and the option to retry.
 - **Change history** - a running log of what's been changed and when.
 - **Drift detection** - checks whether anything Performish set up has
   been reverted by Windows or another program, and offers to reapply it.

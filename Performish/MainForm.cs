@@ -350,11 +350,8 @@ namespace Performish
             if (!dryRun)
                 before = BenchmarkSnapshot.FromSystemSnapshot(await Task.Run(() => _services.Scanner.Scan()));
 
-            var batchResult = await RunningForm.RunAsync(this, "Applying", (token, onLog) => Task.Run(() =>
-            {
-                var ctx = _services.CreateContext(dryRun, onLog);
-                return _services.Runner.ApplyBatch(selection, ctx, wantsRestorePoint, token);
-            }));
+            var batchResult = await RunningForm.RunAsync(this, "Applying",
+                _services, selection, Performish.Core.Backup.ChangeLogAction.Apply, dryRun, wantsRestorePoint);
 
             _lastBatchResults = batchResult.Results;
             _lastBatchWasDryRun = dryRun;
@@ -398,11 +395,8 @@ namespace Performish
             if (!confirmed) return;
 
             var dryRun = DryRun;
-            var batchResult = await RunningForm.RunAsync(this, "Reverting", (token, onLog) => Task.Run(() =>
-            {
-                var ctx = _services.CreateContext(dryRun, onLog);
-                return _services.Runner.UndoBatch(toRevert, ctx, token);
-            }));
+            var batchResult = await RunningForm.RunAsync(this, "Reverting",
+                _services, toRevert, Performish.Core.Backup.ChangeLogAction.Undo, dryRun);
 
             _lastBatchResults = batchResult.Results;
             _lastBatchWasDryRun = dryRun;
