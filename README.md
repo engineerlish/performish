@@ -1,0 +1,52 @@
+# Performish
+
+Performish is a Windows 11 debloat and performance-tuning tool. It helps
+you clean up unnecessary components, disable bloatware, and tune your
+workstation or gaming PC for better performance and efficiency.
+
+## What it does
+
+- **System scan** - reads your machine's hardware, software, and current
+  settings so you know what's on it before changing anything.
+- **Health score** - a simple, at-a-glance score for how "clean" your
+  system currently is.
+- **Debloat options** - remove or disable unwanted preinstalled apps,
+  background services, ads and suggestions, and other clutter, with a
+  clear description and risk level for each one.
+- **Performance and gaming tuning** - power plan, visual effects,
+  background app behavior, and gaming-focused settings aimed at smoother,
+  more responsive performance.
+- **Maintenance tools** - free up disk space by clearing update, cache,
+  and temporary files.
+- **Presets** - Conservative, Balanced, and Aggressive presets for
+  different comfort levels, or pick individual changes yourself.
+- **Dry-run preview** - see exactly what a change will do before it's
+  applied.
+- **Undo and revert** - undo an individual change or revert everything
+  in one click.
+- **Change history** - a running log of what's been changed and when.
+- **Drift detection** - checks whether anything Performish set up has
+  been reverted by Windows or another program, and offers to reapply it.
+- **Before/after reporting** - measure the effect of a change and export
+  a report.
+- **Command-line mode** - run presets unattended from a script or
+  management tool, with the same preview/report options.
+
+## Requirements
+
+- Windows 11
+- Administrator access (most changes require it)
+
+## Getting started
+
+1. Download or build the Performish executable.
+2. Run it as Administrator.
+3. Run a scan to see your system's current state.
+4. Choose a preset or pick individual tweaks, preview them, and apply.
+
+## Safety
+
+Every change can be previewed before it's applied and undone afterward,
+either individually or all at once. As with any system-tuning tool, back
+up anything important before making changes, and review what a change
+does before applying it.
