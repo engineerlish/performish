@@ -1,6 +1,7 @@
 using System;
 using Performish.Core.Backends;
 using Performish.Core.Backup;
+using Performish.Core.Benchmark;
 using Performish.Core.Models;
 using Performish.Core.Scanner;
 using Performish.Core.Tweaks;
@@ -29,12 +30,15 @@ namespace Performish.Core
         public TweakRegistry TweakRegistry { get; }
         public TweakRunner Runner { get; }
         public MigrationResult Migration { get; }
+        public BenchmarkSuiteRunner Benchmarks { get; }
+        public IBenchmarkRunStore BenchmarkHistory { get; }
 
         private AppServices(
             IProcessRunner process, IRegistryBackend registry, IServiceBackend services, IScheduledTaskBackend tasks,
             IAppxBackend appx, IFileSystemBackend fileSystem, IPowerBackend power, IRestorePointBackend restorePoint,
             IUndoStore undoStore, IChangeLogStore changeLog, ISystemInfoBackend systemInfo, SystemScanner scanner,
-            TweakRegistry tweakRegistry, TweakRunner runner, MigrationResult migration)
+            TweakRegistry tweakRegistry, TweakRunner runner, MigrationResult migration,
+            BenchmarkSuiteRunner benchmarks, IBenchmarkRunStore benchmarkHistory)
         {
             Process = process;
             Registry = registry;
@@ -51,6 +55,8 @@ namespace Performish.Core
             TweakRegistry = tweakRegistry;
             Runner = runner;
             Migration = migration;
+            Benchmarks = benchmarks;
+            BenchmarkHistory = benchmarkHistory;
         }
 
         public static AppServices BuildReal()
@@ -74,9 +80,11 @@ namespace Performish.Core
             var scanner = new SystemScanner(systemInfo, power);
             var tweakRegistry = TweakRegistry.BuildDefault();
             var runner = new TweakRunner(changeLog, restorePoint);
+            var benchmarks = new BenchmarkSuiteRunner(systemInfo);
+            var benchmarkHistory = new FileBenchmarkRunStore(DataPaths.BenchmarksDirectory);
 
             return new AppServices(process, registry, services, tasks, appx, fileSystem, power, restorePoint,
-                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, migration);
+                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, migration, benchmarks, benchmarkHistory);
         }
 
         public TweakExecutionContext CreateContext(bool dryRun, Action<string> onLog = null) =>
@@ -103,9 +111,11 @@ namespace Performish.Core
             var scanner = new SystemScanner(systemInfo, power);
             var tweakRegistry = TweakRegistry.BuildDefault();
             var runner = new TweakRunner(changeLog, restorePoint);
+            var benchmarks = new BenchmarkSuiteRunner(systemInfo);
+            var benchmarkHistory = new InMemoryBenchmarkRunStore();
 
             return new AppServices(process, registry, services, tasks, appx, fileSystem, power, restorePoint,
-                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, new MigrationResult());
+                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, new MigrationResult(), benchmarks, benchmarkHistory);
         }
     }
 }

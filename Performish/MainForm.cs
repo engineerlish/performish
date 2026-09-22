@@ -33,6 +33,7 @@ namespace Performish
         private FlowLayoutPanel _buttonPanel;
         private CheckBox _dryRunCheckBox;
         private Button _revertButton;
+        private Button _benchmarkModeButton;
 
         private SystemSnapshot _lastScan;
         // Feeds "Export report" - the last apply/revert batch's results and (if a real, non-dry-run
@@ -97,6 +98,18 @@ namespace Performish
             var healthButton = UiStyle.MakeButton("Health score...");
             healthButton.Click += (s, e) => OpenHealthScore();
 
+            var runBenchmarkButton = UiStyle.MakeButton("Run benchmark now");
+            runBenchmarkButton.Click += async (s, e) => await RunStandaloneBenchmarkAsync();
+
+            var benchmarkHistoryButton = UiStyle.MakeButton("Benchmark history...");
+            benchmarkHistoryButton.Click += (s, e) => OpenBenchmarkHistory();
+
+            // Cycles Off -> Quick -> Full -> Off - a toggle rather than a dropdown/picker dialog, so
+            // "show an estimated time... let the user skip or choose a quick subset" doesn't need its
+            // own screen. Label always shows the current mode plus its time estimate.
+            _benchmarkModeButton = UiStyle.MakeButton("Benchmark: Quick");
+            _benchmarkModeButton.Click += (s, e) => CycleBenchmarkMode();
+
             var reportButton = UiStyle.MakeButton("Export report...");
             reportButton.Click += (s, e) => ExportReport();
 
@@ -114,7 +127,7 @@ namespace Performish
 
             // Disabled until AppServices finishes loading in the background - every one of these
             // needs _services (a scan, the tweak registry, the change log, ...).
-            foreach (var b in new[] { scanButton, browseButton, presetsButton, historyButton, benchmarkButton, driftButton, reportButton, startupButton, healthButton })
+            foreach (var b in new[] { scanButton, browseButton, presetsButton, historyButton, benchmarkButton, driftButton, reportButton, startupButton, healthButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton })
                 b.Enabled = false;
 
             _buttonPanel.Controls.Add(scanButton);
@@ -126,6 +139,9 @@ namespace Performish
             _buttonPanel.Controls.Add(driftButton);
             _buttonPanel.Controls.Add(_revertButton);
             _buttonPanel.Controls.Add(benchmarkButton);
+            _buttonPanel.Controls.Add(runBenchmarkButton);
+            _buttonPanel.Controls.Add(benchmarkHistoryButton);
+            _buttonPanel.Controls.Add(_benchmarkModeButton);
             _buttonPanel.Controls.Add(reportButton);
             _buttonPanel.Controls.Add(_dryRunCheckBox);
 
@@ -148,6 +164,7 @@ namespace Performish
             _settings = settings;
             _services = services;
             _dryRunCheckBox.Checked = _settings.DryRunByDefault;
+            UpdateBenchmarkModeButtonText();
 
             foreach (Control c in _buttonPanel.Controls) c.Enabled = true;
             _revertButton.Enabled = false; // still needs UpdateRevertButtonState() below
@@ -330,6 +347,97 @@ namespace Performish
             dialog.ShowDialog(this);
         }
 
+        // ---- Benchmarking -------------------------------------------------------------------------
+
+        private void CycleBenchmarkMode()
+        {
+            _settings.BenchmarkModeDefault = _settings.BenchmarkModeDefault switch
+            {
+                BenchmarkMode.Off => BenchmarkMode.Quick,
+                BenchmarkMode.Quick => BenchmarkMode.Full,
+                _ => BenchmarkMode.Off
+            };
+            _settings.Save();
+            UpdateBenchmarkModeButtonText();
+        }
+
+        private void UpdateBenchmarkModeButtonText()
+        {
+            var options = BuildBenchmarkOptions();
+            _benchmarkModeButton.Text = _settings.BenchmarkModeDefault == BenchmarkMode.Off
+                ? "Benchmark: Off"
+                : $"Benchmark: {_settings.BenchmarkModeDefault} (~{BenchmarkSuiteRunner.EstimateSeconds(options):0}s)";
+        }
+
+        private BenchmarkOptions BuildBenchmarkOptions()
+        {
+            var options = _settings.BenchmarkModeDefault == BenchmarkMode.Full ? BenchmarkOptions.Full() : BenchmarkOptions.Quick();
+            options.IncludeNetwork = _settings.BenchmarkIncludeNetwork;
+            return options;
+        }
+
+        /// <summary>Captures a real benchmark run, tied to the tweaks about to be applied. Returns
+        /// null when benchmarking is turned Off, so callers don't need to check the setting twice.</summary>
+        private async Task<BenchmarkRun> CaptureBenchmarkAsync(BenchmarkRunKind kind, string label,
+            IEnumerable<string> tweakIds, bool isDryRunPreview, int? healthScore, string pairId)
+        {
+            if (_settings.BenchmarkModeDefault == BenchmarkMode.Off) return null;
+
+            var options = BuildBenchmarkOptions();
+            var run = await Task.Run(() => _services.Benchmarks.Run(options, kind, label, tweakIds, isDryRunPreview, healthScore, pairId));
+            _services.BenchmarkHistory.Save(run);
+            return run;
+        }
+
+        private void ShowBenchmarkComparisonDialog(BenchmarkRun before, BenchmarkRun after)
+        {
+            var options = BuildBenchmarkOptions();
+            var higherIsBetter = _services.Benchmarks.HigherIsBetterByMetric(options);
+            var report = BenchmarkComparer.Compare(before, after, higherIsBetter);
+            using var dialog = new BenchmarkComparisonForm(report);
+            dialog.ShowDialog(this);
+        }
+
+        private async Task RunStandaloneBenchmarkAsync()
+        {
+            SetBusy(true);
+            AppendLine("", UiStyle.Foreground);
+            AppendLine("  Running benchmark checkpoint...", UiStyle.Dim);
+            BenchmarkRun run;
+            try
+            {
+                var options = BuildBenchmarkOptions();
+                if (_settings.BenchmarkModeDefault == BenchmarkMode.Off) options = BenchmarkOptions.Quick(); // "run now" always measures something, even if auto-benchmarking is off
+                var healthScore = _lastScan != null ? HealthScore.Compute(_lastScan).Score : (int?)null;
+                run = await Task.Run(() => _services.Benchmarks.Run(options, BenchmarkRunKind.Standalone, "Manual checkpoint", healthScore: healthScore));
+                _services.BenchmarkHistory.Save(run);
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+
+            AppendLine("  Benchmark checkpoint saved.", UiStyle.Accent);
+
+            var previous = _services.BenchmarkHistory.ReadRecent(2).FirstOrDefault(r => r.Id != run.Id);
+            if (previous != null)
+            {
+                ShowBenchmarkComparisonDialog(previous, run);
+            }
+            else
+            {
+                MessageDialog.Show(this, "Benchmark saved",
+                    "First checkpoint saved - run it again later (or after applying tweaks) to see a comparison.");
+            }
+        }
+
+        private void OpenBenchmarkHistory()
+        {
+            using var dialog = new BenchmarkHistoryForm(_services.BenchmarkHistory.ReadRecent(200));
+            if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedPair != null)
+                ShowBenchmarkComparisonDialog(dialog.SelectedPair.Value.Older, dialog.SelectedPair.Value.Newer);
+        }
+
         private void OpenPresetPicker()
         {
             using var dialog = new PresetPickerForm(_services.TweakRegistry);
@@ -373,15 +481,28 @@ namespace Performish
                 lines.Add(("A System Restore point will be created first (if System Protection allows it).", UiStyle.Dim));
             }
 
+            if (_settings.BenchmarkModeDefault != BenchmarkMode.Off)
+            {
+                lines.Add(("", UiStyle.Foreground));
+                lines.Add(($"Benchmark: {_settings.BenchmarkModeDefault} (~{BenchmarkSuiteRunner.EstimateSeconds(BuildBenchmarkOptions()):0}s before and after) - " +
+                    "change with the \"Benchmark:\" button.", UiStyle.Dim));
+            }
+
             var confirmed = ConfirmDialogForm.Show(this, "Review & apply", lines, "Apply", "Cancel");
             if (!confirmed) return;
 
             var wantsRestorePoint = _settings.CreateRestorePointByDefault && selection.Any(t => t.Risk != RiskLevel.Safe);
             var dryRun = DryRun;
+            var tweakIds = selection.Select(t => t.Id).ToList();
+            var pairId = Guid.NewGuid().ToString("N");
 
             BenchmarkSnapshot before = null;
             if (!dryRun)
                 before = BenchmarkSnapshot.FromSystemSnapshot(await Task.Run(() => _services.Scanner.Scan()));
+
+            var beforeHealthScore = _lastScan != null ? HealthScore.Compute(_lastScan).Score : (int?)null;
+            var benchmarkBaseline = await CaptureBenchmarkAsync(BenchmarkRunKind.Baseline,
+                $"Before: {DescribeSelection(selection)}", tweakIds, isDryRunPreview: dryRun, beforeHealthScore, pairId);
 
             var batchResult = await RunningForm.RunAsync(this, "Applying",
                 _services, selection, Performish.Core.Backup.ChangeLogAction.Apply, dryRun, wantsRestorePoint);
@@ -392,14 +513,35 @@ namespace Performish
 
             if (!dryRun && before != null)
             {
-                var after = BenchmarkSnapshot.FromSystemSnapshot(await Task.Run(() => _services.Scanner.Scan()));
+                var afterScan = await Task.Run(() => _services.Scanner.Scan());
+                var after = BenchmarkSnapshot.FromSystemSnapshot(afterScan);
                 _lastBenchmark = new BenchmarkComparison { Before = before, After = after };
                 ShowBenchmarkComparison(_lastBenchmark);
+
+                if (benchmarkBaseline != null)
+                {
+                    var afterHealthScore = HealthScore.Compute(afterScan).Score;
+                    var benchmarkAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
+                        $"After: {DescribeSelection(selection)}", tweakIds, isDryRunPreview: false, afterHealthScore, pairId);
+                    ShowBenchmarkComparisonDialog(benchmarkBaseline, benchmarkAfter);
+                }
+            }
+            else if (benchmarkBaseline != null)
+            {
+                // Dry run: nothing real changed, so there's nothing real to measure "after" - the
+                // comparison dialog shows this plainly rather than fabricating a result (see
+                // BenchmarkSuiteRunner.Run/BenchmarkComparer's dry-run handling).
+                var dryRunAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
+                    $"After (dry run): {DescribeSelection(selection)}", tweakIds, isDryRunPreview: true, null, pairId);
+                ShowBenchmarkComparisonDialog(benchmarkBaseline, dryRunAfter);
             }
 
             UpdateRevertButtonState();
             RenderHome();
         }
+
+        private static string DescribeSelection(System.Collections.Generic.List<TweakDefinition> selection) =>
+            selection.Count == 1 ? selection[0].Title : $"{selection.Count} tweaks";
 
         // ---- Revert everything ----------------------------------------------------------------
 
@@ -428,12 +570,27 @@ namespace Performish
             if (!confirmed) return;
 
             var dryRun = DryRun;
+            var tweakIds = toRevert.Select(t => t.Id).ToList();
+            var pairId = Guid.NewGuid().ToString("N");
+            var beforeHealthScore = _lastScan != null ? HealthScore.Compute(_lastScan).Score : (int?)null;
+            var benchmarkBaseline = await CaptureBenchmarkAsync(BenchmarkRunKind.Baseline,
+                "Before: revert everything", tweakIds, isDryRunPreview: dryRun, beforeHealthScore, pairId);
+
             var batchResult = await RunningForm.RunAsync(this, "Reverting",
                 _services, toRevert, Performish.Core.Backup.ChangeLogAction.Undo, dryRun);
 
             _lastBatchResults = batchResult.Results;
             _lastBatchWasDryRun = dryRun;
             _lastBenchmark = null;
+
+            if (benchmarkBaseline != null)
+            {
+                int? afterHealthScore = null;
+                if (!dryRun) afterHealthScore = HealthScore.Compute(await Task.Run(() => _services.Scanner.Scan())).Score;
+                var benchmarkAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
+                    "After: revert everything", tweakIds, isDryRunPreview: dryRun, afterHealthScore, pairId);
+                ShowBenchmarkComparisonDialog(benchmarkBaseline, benchmarkAfter);
+            }
 
             UpdateRevertButtonState();
             RenderHome();

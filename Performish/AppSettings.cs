@@ -7,10 +7,19 @@ namespace Performish
     /// <summary>Small UI-level preferences. Uses Performish.Core.Backup.DataPaths.SettingsDirectory
     /// (rather than duplicating the %AppData% path-building logic here, as the pre-rename version
     /// did) so this settings file also benefits from DataPaths' legacy-install migration for free.</summary>
+    public enum BenchmarkMode { Off, Quick, Full }
+
     public sealed class AppSettings
     {
         public bool DryRunByDefault { get; set; } = true;
         public bool CreateRestorePointByDefault { get; set; } = true;
+
+        /// <summary>Which benchmark suite (if any) runs automatically around an apply/revert batch -
+        /// Quick by default so benchmarking never makes routine tweak application feel slow (the
+        /// task's own "no regressions to apply speed" rule); the user can turn it Off or up to Full.
+        /// Never includes network metrics automatically - see BenchmarkIncludeNetwork.</summary>
+        public BenchmarkMode BenchmarkModeDefault { get; set; } = BenchmarkMode.Quick;
+        public bool BenchmarkIncludeNetwork { get; set; } = false;
 
         private static string SettingsPath => Path.Combine(DataPaths.SettingsDirectory, "settings.json");
 

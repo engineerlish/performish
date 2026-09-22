@@ -83,6 +83,16 @@ namespace Performish.Core.Backup
             }
         }
 
+        public static string BenchmarksDirectory
+        {
+            get
+            {
+                var dir = Path.Combine(LocalStateRoot, "benchmarks");
+                Directory.CreateDirectory(dir);
+                return dir;
+            }
+        }
+
         private static string LegacySettingsDirectory => Path.Combine(RoamingRoot, LegacyAppFolderName);
         private static string LegacyLocalStateRoot => Path.Combine(LocalRoot, LegacyAppFolderName);
 
