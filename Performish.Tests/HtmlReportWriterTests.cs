@@ -104,5 +104,69 @@ namespace Performish.Tests
             Assert.StartsWith("<!DOCTYPE html>", html);
             Assert.Contains("</html>", html);
         }
+
+        // ---- Real (sampled-timing) benchmark section ------------------------------------------------
+
+        private static readonly Dictionary<string, bool> HigherIsBetter = new Dictionary<string, bool> { ["CPU idle"] = true };
+
+        private static MetricSampleResult Reliable(string name, double median) => new MetricSampleResult
+        {
+            Name = name, Unit = "%", Category = MetricCategory.System, Available = true, IsReliable = true, Median = median, StdDev = 0.1
+        };
+
+        [Fact]
+        public void Render_RealBenchmark_IncludesMeasuredBeforeAfterAndVerdict()
+        {
+            var before = new BenchmarkRun { Kind = BenchmarkRunKind.Baseline, HealthScore = 50 };
+            before.Metrics.Add(Reliable("CPU idle", 50));
+            var after = new BenchmarkRun { Kind = BenchmarkRunKind.PostApply, HealthScore = 74 };
+            after.Metrics.Add(Reliable("CPU idle", 90));
+
+            var report = BenchmarkComparer.Compare(before, after, HigherIsBetter);
+            var html = HtmlReportWriter.Render(new ReportData { Scan = MakeSnapshot(), RealBenchmark = report });
+
+            Assert.Contains("Real benchmark comparison", html);
+            Assert.Contains("CPU idle", html);
+            Assert.Contains("Improved", html);
+            Assert.Contains("Health score change: +24", html);
+        }
+
+        [Fact]
+        public void Render_RealBenchmark_MultipleTweaks_IncludesAttributionDisclaimer()
+        {
+            var before = new BenchmarkRun { Kind = BenchmarkRunKind.Baseline };
+            before.Metrics.Add(Reliable("CPU idle", 50));
+            var after = new BenchmarkRun { Kind = BenchmarkRunKind.PostApply };
+            after.Metrics.Add(Reliable("CPU idle", 90));
+            after.TweakIds.AddRange(new[] { "a", "b" });
+
+            var report = BenchmarkComparer.Compare(before, after, HigherIsBetter);
+            var html = HtmlReportWriter.Render(new ReportData { RealBenchmark = report });
+
+            Assert.Contains("cannot be attributed to any single tweak", html);
+        }
+
+        [Fact]
+        public void Render_RealBenchmark_UnavailableMetric_NeverShowsAFabricatedNumber()
+        {
+            var before = new BenchmarkRun { Kind = BenchmarkRunKind.Baseline };
+            before.Metrics.Add(MetricSampleResult.Unavailable("Gateway ping latency", "ms", MetricCategory.Network, "no gateway"));
+            var after = new BenchmarkRun { Kind = BenchmarkRunKind.PostApply };
+            after.Metrics.Add(MetricSampleResult.Unavailable("Gateway ping latency", "ms", MetricCategory.Network, "no gateway"));
+
+            var report = BenchmarkComparer.Compare(before, after, HigherIsBetter);
+            var html = HtmlReportWriter.Render(new ReportData { RealBenchmark = report });
+
+            Assert.Contains("Unavailable", html);
+            Assert.DoesNotContain("NaN", html);
+        }
+
+        [Fact]
+        public void Render_NoRealBenchmark_OmitsTheSection()
+        {
+            var html = HtmlReportWriter.Render(new ReportData { Scan = MakeSnapshot() });
+
+            Assert.DoesNotContain("Real benchmark comparison", html);
+        }
     }
 }

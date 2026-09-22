@@ -41,6 +41,7 @@ namespace Performish
         private System.Collections.Generic.List<TweakRunResult> _lastBatchResults;
         private bool _lastBatchWasDryRun;
         private BenchmarkComparison _lastBenchmark;
+        private BenchmarkComparisonReport _lastRealBenchmark;
 
         public MainForm()
         {
@@ -394,6 +395,7 @@ namespace Performish
             var options = BuildBenchmarkOptions();
             var higherIsBetter = _services.Benchmarks.HigherIsBetterByMetric(options);
             var report = BenchmarkComparer.Compare(before, after, higherIsBetter);
+            _lastRealBenchmark = report; // feeds "Export report" - see ExportReport()
             using var dialog = new BenchmarkComparisonForm(report);
             dialog.ShowDialog(this);
         }
@@ -510,6 +512,7 @@ namespace Performish
             _lastBatchResults = batchResult.Results;
             _lastBatchWasDryRun = dryRun;
             _lastBenchmark = null;
+            _lastRealBenchmark = null;
 
             if (!dryRun && before != null)
             {
@@ -582,6 +585,7 @@ namespace Performish
             _lastBatchResults = batchResult.Results;
             _lastBatchWasDryRun = dryRun;
             _lastBenchmark = null;
+            _lastRealBenchmark = null;
 
             if (benchmarkBaseline != null)
             {
@@ -665,7 +669,8 @@ namespace Performish
                     HealthBefore = HealthScore.Compute(_lastScan),
                     BatchResults = _lastBatchResults,
                     WasDryRun = _lastBatchWasDryRun,
-                    Benchmark = _lastBenchmark
+                    Benchmark = _lastBenchmark,
+                    RealBenchmark = _lastRealBenchmark
                 };
                 System.IO.File.WriteAllText(dialog.FileName, HtmlReportWriter.Render(report));
 
