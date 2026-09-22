@@ -118,6 +118,38 @@ namespace Performish
             };
         }
 
+        /// <summary>A labeled group of buttons: a small dim/bold section title above a wrapping row of
+        /// controls. Used to break the home screen's button area into "Tweaks"/"Diagnostics"/
+        /// "Benchmarking"/etc instead of one flat, unstructured row - reuses only existing tokens
+        /// (MakeLabel, Dim, Background) rather than inventing new visual language for it.</summary>
+        public static Control MakeButtonSection(string title, params Control[] controls)
+        {
+            var section = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                BackColor = Background,
+                Margin = new Padding(0, 0, 0, 2)
+            };
+            section.Controls.Add(MakeLabel(title, Dim, bold: true));
+
+            var row = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                BackColor = Background,
+                Margin = new Padding(0)
+            };
+            foreach (var c in controls) row.Controls.Add(c);
+            section.Controls.Add(row);
+
+            return section;
+        }
+
         public static string RiskTag(RiskLevel risk) => risk switch
         {
             RiskLevel.Safe => "SAFE",

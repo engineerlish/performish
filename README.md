@@ -51,6 +51,8 @@ workstation or gaming PC for better performance and efficiency.
   recent, and results can be exported alongside the rest of a report.
 - **Command-line mode** - run presets unattended from a script or
   management tool, with the same preview/report/benchmark options.
+- **Settings** - control whether a System Restore point is created
+  before applying and whether benchmarking includes network metrics.
 
 ## Requirements
 

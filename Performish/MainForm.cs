@@ -35,6 +35,11 @@ namespace Performish
         private Button _revertButton;
         private Button _benchmarkModeButton;
 
+        // The buttons actually need enabling/disabling as a group (loading-gate, busy-gate) - tracked
+        // separately from _buttonPanel's own Controls now that buttons live nested inside per-section
+        // sub-panels (see UiStyle.MakeButtonSection) rather than as _buttonPanel's direct children.
+        private readonly List<Control> _actionControls = new List<Control>();
+
         private SystemSnapshot _lastScan;
         // Feeds "Export report" - the last apply/revert batch's results and (if a real, non-dry-run
         // batch) its before/after benchmark. Null until a batch has actually run in this session.
@@ -68,7 +73,8 @@ namespace Performish
                 AutoSize = true,
                 BackColor = UiStyle.Background,
                 Padding = new Padding(10),
-                WrapContents = true
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false
             };
 
             var scanButton = UiStyle.MakeButton("Scan");
@@ -114,6 +120,9 @@ namespace Performish
             var reportButton = UiStyle.MakeButton("Export report...");
             reportButton.Click += (s, e) => ExportReport();
 
+            var settingsButton = UiStyle.MakeButton("Settings...");
+            settingsButton.Click += (s, e) => OpenSettings();
+
             // Default true (matches AppSettings' own default) until the real, persisted value loads
             // asynchronously - see OnFirstShownAsync(). Never mutates _settings before it exists.
             _dryRunCheckBox = UiStyle.MakeCheckBox("Dry run (nothing actually changes)");
@@ -127,24 +136,29 @@ namespace Performish
             };
 
             // Disabled until AppServices finishes loading in the background - every one of these
-            // needs _services (a scan, the tweak registry, the change log, ...).
-            foreach (var b in new[] { scanButton, browseButton, presetsButton, historyButton, benchmarkButton, driftButton, reportButton, startupButton, healthButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton })
-                b.Enabled = false;
+            // needs _services (a scan, the tweak registry, the change log, ...). Settings only needs
+            // _settings (loads at the same time) so it's gated the same way for a consistent "nothing
+            // is clickable until initialization finishes" feel.
+            _actionControls.AddRange(new Control[]
+            {
+                scanButton, browseButton, presetsButton, _revertButton, healthButton, startupButton,
+                driftButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton,
+                benchmarkButton, historyButton, reportButton, settingsButton
+            });
+            foreach (var c in _actionControls) c.Enabled = false;
 
-            _buttonPanel.Controls.Add(scanButton);
-            _buttonPanel.Controls.Add(browseButton);
-            _buttonPanel.Controls.Add(presetsButton);
-            _buttonPanel.Controls.Add(healthButton);
-            _buttonPanel.Controls.Add(startupButton);
-            _buttonPanel.Controls.Add(historyButton);
-            _buttonPanel.Controls.Add(driftButton);
-            _buttonPanel.Controls.Add(_revertButton);
-            _buttonPanel.Controls.Add(benchmarkButton);
-            _buttonPanel.Controls.Add(runBenchmarkButton);
-            _buttonPanel.Controls.Add(benchmarkHistoryButton);
-            _buttonPanel.Controls.Add(_benchmarkModeButton);
-            _buttonPanel.Controls.Add(reportButton);
-            _buttonPanel.Controls.Add(_dryRunCheckBox);
+            // Grouped into labeled sections instead of one flat wrapped row of 14 controls - see
+            // UiStyle.MakeButtonSection and NEXT_DIRECTIONS.md "Direction C: day-to-day usability".
+            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Tweaks",
+                scanButton, browseButton, presetsButton, _revertButton));
+            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Diagnostics",
+                healthButton, startupButton, driftButton));
+            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Benchmarking",
+                runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton, benchmarkButton));
+            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("History & reports",
+                historyButton, reportButton));
+            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Options",
+                settingsButton, _dryRunCheckBox));
 
             var host = new Panel { Dock = DockStyle.Fill, BackColor = UiStyle.Background, Padding = new Padding(12) };
             host.Controls.Add(_console);
@@ -167,7 +181,7 @@ namespace Performish
             _dryRunCheckBox.Checked = _settings.DryRunByDefault;
             UpdateBenchmarkModeButtonText();
 
-            foreach (Control c in _buttonPanel.Controls) c.Enabled = true;
+            foreach (var c in _actionControls) c.Enabled = true;
             _revertButton.Enabled = false; // still needs UpdateRevertButtonState() below
 
             RenderHome();
@@ -308,7 +322,7 @@ namespace Performish
 
         private void SetBusy(bool busy)
         {
-            foreach (Control c in _buttonPanel.Controls) c.Enabled = !busy;
+            foreach (var c in _actionControls) c.Enabled = !busy;
             // The blanket enable above would incorrectly re-enable "Revert everything" even when
             // nothing is applied - re-derive its real state immediately after.
             if (!busy) UpdateRevertButtonState();
@@ -346,6 +360,13 @@ namespace Performish
 
             using var dialog = new HealthScoreForm(HealthScore.Compute(_lastScan));
             dialog.ShowDialog(this);
+        }
+
+        private void OpenSettings()
+        {
+            using var dialog = new SettingsForm(_settings);
+            dialog.ShowDialog(this);
+            UpdateBenchmarkModeButtonText(); // BenchmarkIncludeNetwork feeds the mode button's time estimate
         }
 
         // ---- Benchmarking -------------------------------------------------------------------------
