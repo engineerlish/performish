@@ -118,6 +118,45 @@ namespace Performish.Tests
             var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--silent" });
             Assert.True(options.Silent);
         }
+
+        [Fact]
+        public void Benchmark_IsCaptured_QuickByDefault()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--benchmark" });
+            Assert.Null(options.ParseError);
+            Assert.True(options.Benchmark);
+            Assert.False(options.BenchmarkFull);
+        }
+
+        [Fact]
+        public void BenchmarkFull_AlsoSetsBenchmark()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--benchmark-full" });
+            Assert.True(options.Benchmark);
+            Assert.True(options.BenchmarkFull);
+        }
+
+        [Fact]
+        public void BenchmarkNetwork_WithoutBenchmark_IsAnError()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--benchmark-network" });
+            Assert.NotNull(options.ParseError);
+        }
+
+        [Fact]
+        public void BenchmarkNetwork_WithBenchmark_NoError()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--benchmark", "--benchmark-network" });
+            Assert.Null(options.ParseError);
+            Assert.True(options.BenchmarkNetwork);
+        }
+
+        [Fact]
+        public void NoBenchmarkFlags_BenchmarkDefaultsOff()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative" });
+            Assert.False(options.Benchmark);
+        }
     }
 
     /// <summary>CliRunner tests use AppServices.BuildFake() exclusively - including for the
@@ -233,6 +272,46 @@ namespace Performish.Tests
 
             Assert.Equal(CliExitCode.Success, result);
             Assert.Contains(_output, l => l.Contains("Nothing to revert"));
+        }
+
+        [Fact]
+        public void Run_WithBenchmarkFlag_DryRun_MeasuresBaselineButNotAfter()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--dry-run", "--benchmark" });
+            var result = new CliRunner().Run(options, AppServices.BuildFake(), _output.Add);
+
+            Assert.Equal(CliExitCode.Success, result);
+            Assert.Contains(_output, l => l.Contains("Benchmarking (baseline"));
+            Assert.Contains(_output, l => l.Contains("not measured after (dry run)"));
+        }
+
+        [Fact]
+        public void Run_WithBenchmarkFlag_RealApply_MeasuresBeforeAndAfter()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--apply", "--yes", "--benchmark" });
+            var result = new CliRunner().Run(options, AppServices.BuildFake(), _output.Add, () => true);
+
+            Assert.Equal(CliExitCode.Success, result);
+            Assert.Contains(_output, l => l.Contains("improved") || l.Contains("worse"));
+        }
+
+        [Fact]
+        public void Run_WithBenchmarkAndReportPath_IncludesRealBenchmarkSectionInReport()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--apply", "--yes", "--benchmark", "--report", _tempReportPath });
+            new CliRunner().Run(options, AppServices.BuildFake(), _output.Add, () => true);
+
+            var content = File.ReadAllText(_tempReportPath);
+            Assert.Contains("Real benchmark comparison", content);
+        }
+
+        [Fact]
+        public void Run_WithoutBenchmarkFlag_NeverMentionsBenchmarking()
+        {
+            var options = CliOptionsParser.Parse(new[] { "--preset", "conservative", "--dry-run" });
+            new CliRunner().Run(options, AppServices.BuildFake(), _output.Add);
+
+            Assert.DoesNotContain(_output, l => l.Contains("Benchmarking"));
         }
 
         [Fact]

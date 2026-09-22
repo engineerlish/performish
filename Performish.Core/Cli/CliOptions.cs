@@ -14,6 +14,13 @@ namespace Performish.Core.Cli
         public bool Yes { get; set; }
         public bool Silent { get; set; }
         public string ReportPath { get; set; }
+
+        /// <summary>Off by default even in a headless run - fleet/RMM use means every extra second
+        /// multiplies across many machines, so benchmarking here is opt-in via --benchmark/
+        /// --benchmark-full, unlike the UI's Quick-by-default. See CliRunner.</summary>
+        public bool Benchmark { get; set; }
+        public bool BenchmarkFull { get; set; }
+        public bool BenchmarkNetwork { get; set; }
     }
 
     /// <summary>Parses `Performish.exe --preset balanced --dry-run --report out.html` style
@@ -76,6 +83,19 @@ namespace Performish.Core.Cli
                         options.ReportPath = args[i];
                         break;
 
+                    case "--benchmark":
+                        options.Benchmark = true;
+                        break;
+
+                    case "--benchmark-full":
+                        options.Benchmark = true;
+                        options.BenchmarkFull = true;
+                        break;
+
+                    case "--benchmark-network":
+                        options.BenchmarkNetwork = true;
+                        break;
+
                     default:
                         options.ParseError = $"Unknown argument: {args[i]}";
                         return options;
@@ -90,6 +110,8 @@ namespace Performish.Core.Cli
                     options.ParseError = "--preset and --revert-all cannot both be given.";
                 else if (!options.DryRun && !options.Yes)
                     options.ParseError = "A real (non-dry-run) run needs --apply AND --yes explicitly - refusing to guess.";
+                else if (options.BenchmarkNetwork && !options.Benchmark)
+                    options.ParseError = "--benchmark-network requires --benchmark or --benchmark-full.";
             }
 
             return options;
@@ -98,8 +120,8 @@ namespace Performish.Core.Cli
         public const string HelpText =
 @"Performish command-line mode
 
-  Performish.exe --preset <conservative|balanced|aggressive> [--dry-run|--apply --yes] [--report <path.html>] [--silent]
-  Performish.exe --revert-all [--dry-run|--apply --yes] [--report <path.html>] [--silent]
+  Performish.exe --preset <conservative|balanced|aggressive> [--dry-run|--apply --yes] [--report <path.html>] [--silent] [--benchmark|--benchmark-full] [--benchmark-network]
+  Performish.exe --revert-all [--dry-run|--apply --yes] [--report <path.html>] [--silent] [--benchmark|--benchmark-full] [--benchmark-network]
   Performish.exe --help
 
 Options:
@@ -110,6 +132,11 @@ Options:
   --yes             Required alongside --apply to confirm a real, non-dry-run run.
   --report <path>   Write an HTML report to this path (scan, health score, tweak-by-tweak result).
   --silent          Suppress console output (a --report file, if given, is still written).
+  --benchmark       Capture a real, sampled before/after benchmark (CPU/memory/disk) around this run.
+                    Off by default even headlessly - every extra second multiplies across a fleet.
+  --benchmark-full  Same, plus thread count and disk read/write throughput (a few seconds slower).
+  --benchmark-network  Also measure DNS/gateway ping latency (real network activity) - requires
+                    --benchmark or --benchmark-full.
 
 With no arguments, Performish launches its normal graphical UI.
 Exit codes: 0 = success, 1 = one or more tweaks failed, 2 = argument error, 3 = not elevated.";

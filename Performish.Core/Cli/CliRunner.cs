@@ -78,6 +78,20 @@ namespace Performish.Core.Cli
             BenchmarkSnapshot before = null;
             if (!options.DryRun) before = BenchmarkSnapshot.FromSystemSnapshot(scanBefore);
 
+            var tweakIds = tweaks.Select(t => t.Id).ToList();
+            var pairId = Guid.NewGuid().ToString("N");
+            BenchmarkRun realBaseline = null;
+            if (options.Benchmark)
+            {
+                Write($"Benchmarking (baseline, {(options.BenchmarkFull ? "full" : "quick")})...");
+                var benchOptions = options.BenchmarkFull ? BenchmarkOptions.Full() : BenchmarkOptions.Quick();
+                benchOptions.IncludeNetwork = options.BenchmarkNetwork;
+                realBaseline = services.Benchmarks.Run(benchOptions, BenchmarkRunKind.Baseline,
+                    $"CLI before: {(options.RevertAll ? "revert-all" : options.SelectedPreset.ToString())}",
+                    tweakIds, isDryRunPreview: options.DryRun, healthBefore.Score, pairId);
+                services.BenchmarkHistory.Save(realBaseline);
+            }
+
             var wantsRestorePoint = !options.DryRun && !options.RevertAll && tweaks.Any(t => t.Risk != Models.RiskLevel.Safe);
             var batchResult = options.RevertAll
                 ? services.Runner.UndoBatch(tweaks, ctx)
@@ -88,6 +102,7 @@ namespace Performish.Core.Cli
             Write($"Done. {succeeded} succeeded, {failed} failed.");
 
             BenchmarkComparison benchmark = null;
+            BenchmarkComparisonReport realBenchmark = null;
             var scanAfter = scanBefore;
             HealthScoreResult healthAfter = healthBefore;
             if (!options.DryRun && before != null)
@@ -96,6 +111,23 @@ namespace Performish.Core.Cli
                 healthAfter = HealthScore.Compute(scanAfter);
                 benchmark = new BenchmarkComparison { Before = before, After = BenchmarkSnapshot.FromSystemSnapshot(scanAfter) };
                 Write($"Health score after: {healthAfter.Score}/{HealthScore.TotalMax}");
+            }
+
+            if (realBaseline != null)
+            {
+                var benchOptions = options.BenchmarkFull ? BenchmarkOptions.Full() : BenchmarkOptions.Quick();
+                benchOptions.IncludeNetwork = options.BenchmarkNetwork;
+                var realAfter = services.Benchmarks.Run(benchOptions, BenchmarkRunKind.PostApply,
+                    $"CLI after: {(options.RevertAll ? "revert-all" : options.SelectedPreset.ToString())}",
+                    tweakIds, isDryRunPreview: options.DryRun, !options.DryRun ? healthAfter.Score : (int?)null, pairId);
+                services.BenchmarkHistory.Save(realAfter);
+
+                realBenchmark = BenchmarkComparer.Compare(realBaseline, realAfter, services.Benchmarks.HigherIsBetterByMetric(benchOptions));
+                var improved = realBenchmark.Metrics.Count(m => m.Verdict == ComparisonVerdict.Improved);
+                var worse = realBenchmark.Metrics.Count(m => m.Verdict == ComparisonVerdict.Worse);
+                Write(options.DryRun
+                    ? "Benchmark: not measured after (dry run)."
+                    : $"Benchmark: {improved} improved, {worse} worse (see report for detail).");
             }
 
             if (!string.IsNullOrEmpty(options.ReportPath))
@@ -108,7 +140,8 @@ namespace Performish.Core.Cli
                     HealthAfter = !options.DryRun ? healthAfter : null,
                     BatchResults = batchResult.Results,
                     WasDryRun = options.DryRun,
-                    Benchmark = benchmark
+                    Benchmark = benchmark,
+                    RealBenchmark = realBenchmark
                 };
                 File.WriteAllText(options.ReportPath, HtmlReportWriter.Render(report));
                 Write($"Report written to {options.ReportPath}");
