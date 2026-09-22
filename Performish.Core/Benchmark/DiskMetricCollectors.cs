@@ -15,6 +15,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "MB/s";
         public MetricCategory Category => MetricCategory.Disk;
         public bool RunByDefault => true;
+        public bool HigherIsBetter => true;
 
         // 8 MB: large enough that per-call filesystem overhead doesn't dominate the timing, small/
         // fast enough (well under a second even on a slow drive) not to be disruptive.
@@ -64,6 +65,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "MB/s";
         public MetricCategory Category => MetricCategory.Disk;
         public bool RunByDefault => true;
+        public bool HigherIsBetter => true;
 
         private const int FileSizeBytes = DiskWriteThroughputCollector.FileSizeBytes;
         private readonly string _directory;
@@ -115,6 +117,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "ms";
         public MetricCategory Category => MetricCategory.Disk;
         public bool RunByDefault => true;
+        public bool HigherIsBetter => false;
 
         private readonly string _directory;
 

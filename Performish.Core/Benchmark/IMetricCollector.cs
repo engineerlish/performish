@@ -14,6 +14,12 @@ namespace Performish.Core.Benchmark
         /// otherwise shouldn't run unless the user explicitly asks - see BENCHMARK_PLAN.md "scope".</summary>
         bool RunByDefault { get; }
 
+        /// <summary>True if a larger number is the better outcome (e.g. CPU idle %, available memory,
+        /// disk throughput); false if smaller is better (e.g. latency, process/thread count). Drives
+        /// BenchmarkComparer's improved/worse direction - kept on the collector, next to the metric it
+        /// describes, rather than guessed from the metric name in the comparison layer.</summary>
+        bool HigherIsBetter { get; }
+
         MetricSampleResult Collect(int sampleCount, int warmupCount);
     }
 }

@@ -16,6 +16,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "%";
         public MetricCategory Category => MetricCategory.System;
         public bool RunByDefault => true;
+        public bool HigherIsBetter => true;
 
         private readonly int _intervalMs;
 
@@ -64,6 +65,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "MB";
         public MetricCategory Category => MetricCategory.System;
         public bool RunByDefault => true;
+        public bool HigherIsBetter => true;
 
         private readonly ISystemInfoBackend _info;
 
@@ -85,6 +87,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "processes";
         public MetricCategory Category => MetricCategory.System;
         public bool RunByDefault => true;
+        public bool HigherIsBetter => false;
 
         public MetricSampleResult Collect(int sampleCount, int warmupCount) =>
             BenchmarkSampler.Sample(Name, Unit, Category, () => Process.GetProcesses().Length, sampleCount, warmupCount);
@@ -96,6 +99,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "threads";
         public MetricCategory Category => MetricCategory.System;
         public bool RunByDefault => true;
+        public bool HigherIsBetter => false;
 
         public MetricSampleResult Collect(int sampleCount, int warmupCount) =>
             BenchmarkSampler.Sample(Name, Unit, Category, MeasureOnce, sampleCount, warmupCount);

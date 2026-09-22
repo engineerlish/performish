@@ -27,7 +27,10 @@ namespace Performish.Core.Benchmark
         public bool Available { get; set; } = true;
         public string UnavailableReason { get; set; }
 
-        public IReadOnlyList<double> Samples { get; set; } = Array.Empty<double>();
+        // List<double>, not IReadOnlyList<double> - a JSON-serialized benchmark run (BenchmarkRunStore)
+        // needs a concrete, settable collection type to round-trip reliably through System.Text.Json;
+        // see DECISIONS.md/RegistryValueSnapshot's history for the same lesson learned once already.
+        public List<double> Samples { get; set; } = new List<double>();
 
         public double Median { get; set; }
         public double Min { get; set; }

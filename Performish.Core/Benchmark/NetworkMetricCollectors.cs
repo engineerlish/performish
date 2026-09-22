@@ -15,6 +15,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "ms";
         public MetricCategory Category => MetricCategory.Network;
         public bool RunByDefault => false;
+        public bool HigherIsBetter => false;
 
         // Fixed, stable, well-known hostnames - not a specific resolver (the system's configured
         // resolver answers whichever is asked) - see BENCHMARK_PLAN.md's "deliberate simplification".
@@ -43,6 +44,7 @@ namespace Performish.Core.Benchmark
         public string Unit => "ms";
         public MetricCategory Category => MetricCategory.Network;
         public bool RunByDefault => false;
+        public bool HigherIsBetter => false;
 
         private const int TimeoutMs = 1000;
 
