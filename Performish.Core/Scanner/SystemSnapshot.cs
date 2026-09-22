@@ -29,6 +29,13 @@ namespace Performish.Core.Scanner
         public string DisplayName { get; set; }
         public string StartMode { get; set; }
         public bool Running { get; set; }
+
+        /// <summary>The service's executable command line (Win32_Service.PathName), e.g.
+        /// <c>"C:\Windows\System32\svchost.exe" -k netsvcs</c> - used to tell a Windows-shipped
+        /// service (System32/SysWOW64) from one installed by hardware-vendor or third-party software,
+        /// without guessing from the name. Empty/null if the backend couldn't read it (never treated
+        /// as third-party in that case - see HealthScore.IsThirdPartyServicePath).</summary>
+        public string BinaryPath { get; set; }
     }
 
     /// <summary>Read-only snapshot of the machine's relevant state - the output of a scan, and the

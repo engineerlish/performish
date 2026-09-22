@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Win32;
 using Performish.Core.Backup;
 using Performish.Core.Models;
@@ -178,6 +179,51 @@ namespace Performish.Tests
 
             var ex = Record.Exception(() => runner.DetectDrift(emptyRegistry, bundle.Context));
             Assert.Null(ex);
+        }
+
+        // ---- "Partially applied" state (health-score task Step 2: "Test with simulated state for
+        // applied, not applied, partially applied, and drift"). TweakState has no PartiallyApplied
+        // value - a multi-value tweak's Check() must collapse a partial match to NotApplied, never
+        // silently report Applied, so a drift/undo caller never trusts a half-true reading. Verified
+        // directly against gaming.mouse_precision_disable (Performish.Core.Tweaks.GamingTweaks), the
+        // library's clearest multi-registry-value tweak (3 values must all match). ------------------
+
+        private static TweakDefinition MousePrecisionTweak() =>
+            Performish.Core.Tweaks.GamingTweaks.All().Single(t => t.Id == "gaming.mouse_precision_disable");
+
+        [Fact]
+        public void MultiValueTweak_AllValuesMatch_ReportsApplied()
+        {
+            var bundle = FakeContextFactory.Create();
+            var tweak = MousePrecisionTweak();
+            bundle.Registry.Write(RegistryHive.CurrentUser, @"Control Panel\Mouse", "MouseSpeed", "0", RegistryValueKind.String);
+            bundle.Registry.Write(RegistryHive.CurrentUser, @"Control Panel\Mouse", "MouseThreshold1", "0", RegistryValueKind.String);
+            bundle.Registry.Write(RegistryHive.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2", "0", RegistryValueKind.String);
+
+            Assert.Equal(TweakState.Applied, tweak.Check(bundle.Context));
+        }
+
+        [Fact]
+        public void MultiValueTweak_OnlySomeValuesMatch_ReportsNotAppliedNeverAppliedOrPartial()
+        {
+            var bundle = FakeContextFactory.Create();
+            var tweak = MousePrecisionTweak();
+            // Only 1 of the 3 required values set correctly - simulates another tool, or a partial/
+            // interrupted apply, leaving the setting in a mixed state.
+            bundle.Registry.Write(RegistryHive.CurrentUser, @"Control Panel\Mouse", "MouseSpeed", "0", RegistryValueKind.String);
+            bundle.Registry.Write(RegistryHive.CurrentUser, @"Control Panel\Mouse", "MouseThreshold1", "1", RegistryValueKind.String);
+            bundle.Registry.Write(RegistryHive.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2", "1", RegistryValueKind.String);
+
+            Assert.Equal(TweakState.NotApplied, tweak.Check(bundle.Context));
+        }
+
+        [Fact]
+        public void MultiValueTweak_NoValuesSet_ReportsNotApplied()
+        {
+            var bundle = FakeContextFactory.Create();
+            var tweak = MousePrecisionTweak();
+
+            Assert.Equal(TweakState.NotApplied, tweak.Check(bundle.Context));
         }
     }
 }

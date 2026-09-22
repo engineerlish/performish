@@ -239,7 +239,7 @@ namespace Performish.Core.Scanner
             var services = new List<ServiceInfo>();
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Name, DisplayName, StartMode, State FROM Win32_Service");
+                using var searcher = new ManagementObjectSearcher("SELECT Name, DisplayName, StartMode, State, PathName FROM Win32_Service");
                 foreach (ManagementObject mo in searcher.Get())
                 {
                     services.Add(new ServiceInfo
@@ -247,7 +247,8 @@ namespace Performish.Core.Scanner
                         Name = mo["Name"] as string,
                         DisplayName = mo["DisplayName"] as string,
                         StartMode = mo["StartMode"] as string,
-                        Running = (mo["State"] as string) == "Running"
+                        Running = (mo["State"] as string) == "Running",
+                        BinaryPath = mo["PathName"] as string
                     });
                 }
             }
