@@ -8,8 +8,15 @@ workstation or gaming PC for better performance and efficiency.
 
 - **System scan** - reads your machine's hardware, software, and current
   settings so you know what's on it before changing anything.
-- **Health score** - a simple, at-a-glance score for how "clean" your
-  system currently is.
+- **Health score** - a 0-100 score for how "clean" your system currently
+  is, with a full breakdown of every factor behind it: what's being
+  measured, how many points it earned, and plain-language guidance on
+  what to do about it - including when something is outside what
+  Performish (or any software) can change directly.
+- **Startup item review** - see everything set to launch automatically
+  when you sign in and choose which ones to stop, without uninstalling
+  anything - each one can still be launched manually afterward, and the
+  change is fully undoable.
 - **Plain-language options** - every change has a short, clear title
   describing what it does, with the full explanation (what changes, why
   it helps, risk level, whether a reboot or admin rights are needed, and
