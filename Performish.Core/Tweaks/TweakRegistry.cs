@@ -104,7 +104,14 @@ namespace Performish.Core.Tweaks
 
         public IReadOnlyList<TweakDefinition> All => _tweaks;
 
-        public TweakDefinition Find(string id) => _tweaks.FirstOrDefault(t => t.Id == id);
+        /// <summary>Falls back to StartupItemTweaks.TryResolveFromId() when the id isn't in this
+        /// registry's own fixed list - a startup-item tweak (see StartupItemTweaks) is never part of
+        /// the fixed catalog BuildDefault() assembles, but its id alone is enough to reconstruct a
+        /// working Check/Apply/Undo, which is what lets a change-log entry for one stay undoable from
+        /// the History dialog (TweakRegistry.Find(entry.TweakId)) in any session, not just the one
+        /// that originally showed it.</summary>
+        public TweakDefinition Find(string id) =>
+            _tweaks.FirstOrDefault(t => t.Id == id) ?? StartupItemTweaks.TryResolveFromId(id);
 
         public IEnumerable<TweakDefinition> ByCategory(TweakCategory category) => _tweaks.Where(t => t.Category == category);
 

@@ -11,6 +11,19 @@ namespace Performish.Core.Benchmark
         public int Points { get; set; }
         public int MaxPoints { get; set; }
         public string Detail { get; set; }
+
+        /// <summary>What this factor means, and what to do about it if it's not at full marks - shown
+        /// in the score breakdown screen next to the factor. Always populated, even at full marks
+        /// (explains what "full marks" means for that factor), so the screen never shows a number with
+        /// no explanation.</summary>
+        public string Guidance { get; set; }
+
+        /// <summary>True if this factor is something the tool can act on, false if it is purely a
+        /// "here's your current state" measurement (e.g. free disk space depends on the user's own
+        /// files, not something a debloat tool would ever delete) or is explicitly hardware/
+        /// environment-limited. Drives whether the score screen shows an action button for this
+        /// factor.</summary>
+        public bool ToolCanAct { get; set; }
     }
 
     public sealed class HealthScoreResult
@@ -76,19 +89,46 @@ namespace Performish.Core.Benchmark
             // install (a handful of first-party entries is normal; dozens is not).
             var count = s.StartupItems.Count;
             var points = Math.Max(0, StartupItemsMax - (int)Math.Round(count * (StartupItemsMax / 20.0)));
-            return new HealthScoreFactor { Name = "Startup items", Points = points, MaxPoints = StartupItemsMax, Detail = $"{count} startup item(s)" };
+            return new HealthScoreFactor
+            {
+                Name = "Startup items",
+                Points = points,
+                MaxPoints = StartupItemsMax,
+                Detail = $"{count} startup item(s)",
+                ToolCanAct = points < StartupItemsMax,
+                Guidance = points >= StartupItemsMax
+                    ? "A short startup list - nothing to change here."
+                    : "Use \"Startup items...\" to review what launches at sign-in and stop the ones you " +
+                      "don't need running automatically. Each item can still be launched manually afterward."
+            };
         }
 
         private static HealthScoreFactor ScoreDiskSpace(SystemSnapshot s)
         {
             if (s.TotalDiskSpaceBytes <= 0)
-                return new HealthScoreFactor { Name = "Free disk space", Points = 0, MaxPoints = DiskSpaceMax, Detail = "unknown" };
+                return new HealthScoreFactor
+                {
+                    Name = "Free disk space", Points = 0, MaxPoints = DiskSpaceMax, Detail = "unknown",
+                    Guidance = "Couldn't read the system drive's free space.", ToolCanAct = false
+                };
 
             var freePct = (double)s.FreeDiskSpaceBytes / s.TotalDiskSpaceBytes * 100.0;
             // Below 5% free = 0, at or above 20% free = full marks - Windows itself starts warning
             // around the 5-10% mark, and update/temp headroom problems concentrate below 20%.
             var points = (int)Math.Round(Math.Clamp((freePct - 5.0) / 15.0, 0.0, 1.0) * DiskSpaceMax);
-            return new HealthScoreFactor { Name = "Free disk space", Points = points, MaxPoints = DiskSpaceMax, Detail = $"{freePct:0.0}% free" };
+            return new HealthScoreFactor
+            {
+                Name = "Free disk space",
+                Points = points,
+                MaxPoints = DiskSpaceMax,
+                Detail = $"{freePct:0.0}% free",
+                ToolCanAct = points < DiskSpaceMax,
+                Guidance = points >= DiskSpaceMax
+                    ? "Plenty of free space - nothing to change here."
+                    : "Run the Maintenance tweaks (Windows Update cache, thumbnail cache, shader cache, " +
+                      "browser caches) to reclaim space safely, or free up space yourself (uninstall unused " +
+                      "apps, move large files off this drive)."
+            };
         }
 
         private static HealthScoreFactor ScoreUptime(SystemSnapshot s)
@@ -100,7 +140,19 @@ namespace Performish.Core.Benchmark
             // signal than the others.
             var hours = s.UptimeHours;
             var points = (int)Math.Round(Math.Clamp(1.0 - (hours - 48.0) / (336.0 - 48.0), 0.0, 1.0) * UptimeMax);
-            return new HealthScoreFactor { Name = "Uptime", Points = points, MaxPoints = UptimeMax, Detail = $"{hours:0.0} hour(s)" };
+            return new HealthScoreFactor
+            {
+                Name = "Uptime",
+                Points = points,
+                MaxPoints = UptimeMax,
+                Detail = $"{hours:0.0} hour(s)",
+                ToolCanAct = false, // only a reboot fixes this - never something to do for the user
+                Guidance = points >= UptimeMax
+                    ? "Recently rebooted - nothing to change here."
+                    : "This machine has been running a long time without a reboot. Several tweaks (and " +
+                      "Windows Update installs) only take full effect after one - saving your work and " +
+                      "restarting may help, at your convenience."
+            };
         }
 
         /// <summary>A scheduled task shipped and owned by Windows itself, never something a debloat
@@ -126,7 +178,12 @@ namespace Performish.Core.Benchmark
                 Name = "Third-party scheduled tasks",
                 Points = points,
                 MaxPoints = ThirdPartyScheduledTasksMax,
-                Detail = $"{thirdPartyCount} enabled (Windows's own tasks are not counted)"
+                Detail = $"{thirdPartyCount} enabled (Windows's own tasks are not counted)",
+                ToolCanAct = false, // Performish has no per-task disable feature yet - see ROADMAP.md
+                Guidance = points >= ThirdPartyScheduledTasksMax
+                    ? "A light footprint of installed-software tasks - nothing to change here."
+                    : "Scheduled by software you've installed (updaters, vendor maintenance tasks), not " +
+                      "Windows itself. Review Task Scheduler for anything from software you no longer use."
             };
         }
 
@@ -177,7 +234,13 @@ namespace Performish.Core.Benchmark
                 Name = "Third-party running services",
                 Points = points,
                 MaxPoints = ThirdPartyServicesRunningMax,
-                Detail = $"{thirdPartyCount} running (Windows's own services are not counted; not all of these can safely be reduced)"
+                Detail = $"{thirdPartyCount} running (Windows's own services are not counted)",
+                ToolCanAct = false, // deliberately no blanket "disable services" feature - see ROADMAP.md
+                Guidance = points >= ThirdPartyServicesRunningMax
+                    ? "A light footprint of installed-software services - nothing to change here."
+                    : "Mostly hardware-vendor suites (GPU, network card, audio) and security software that " +
+                      "should stay - Performish will never suggest disabling these. If you recognize a " +
+                      "service from software you no longer use, remove that software's own way, not here."
             };
         }
     }

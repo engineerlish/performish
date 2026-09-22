@@ -91,6 +91,12 @@ namespace Performish
             var driftButton = UiStyle.MakeButton("Check for drift...");
             driftButton.Click += async (s, e) => await CheckForDriftAsync();
 
+            var startupButton = UiStyle.MakeButton("Startup items...");
+            startupButton.Click += (s, e) => OpenStartupItems();
+
+            var healthButton = UiStyle.MakeButton("Health score...");
+            healthButton.Click += (s, e) => OpenHealthScore();
+
             var reportButton = UiStyle.MakeButton("Export report...");
             reportButton.Click += (s, e) => ExportReport();
 
@@ -108,12 +114,14 @@ namespace Performish
 
             // Disabled until AppServices finishes loading in the background - every one of these
             // needs _services (a scan, the tweak registry, the change log, ...).
-            foreach (var b in new[] { scanButton, browseButton, presetsButton, historyButton, benchmarkButton, driftButton, reportButton })
+            foreach (var b in new[] { scanButton, browseButton, presetsButton, historyButton, benchmarkButton, driftButton, reportButton, startupButton, healthButton })
                 b.Enabled = false;
 
             _buttonPanel.Controls.Add(scanButton);
             _buttonPanel.Controls.Add(browseButton);
             _buttonPanel.Controls.Add(presetsButton);
+            _buttonPanel.Controls.Add(healthButton);
+            _buttonPanel.Controls.Add(startupButton);
             _buttonPanel.Controls.Add(historyButton);
             _buttonPanel.Controls.Add(driftButton);
             _buttonPanel.Controls.Add(_revertButton);
@@ -295,6 +303,31 @@ namespace Performish
             using var dialog = new TweakBrowserForm(_services.TweakRegistry.All, _services, Enumerable.Empty<string>(), category);
             if (dialog.ShowDialog(this) == DialogResult.OK && dialog.ConfirmedSelection.Count > 0)
                 _ = ReviewAndApplyAsync(dialog.ConfirmedSelection);
+        }
+
+        private void OpenStartupItems()
+        {
+            if (_lastScan == null)
+            {
+                MessageDialog.Show(this, "No scan yet", "Click Scan first - startup items come from a system scan.");
+                return;
+            }
+
+            using var dialog = new StartupItemsForm(_lastScan.StartupItems);
+            if (dialog.ShowDialog(this) == DialogResult.OK && dialog.ConfirmedSelection.Count > 0)
+                _ = ReviewAndApplyAsync(dialog.ConfirmedSelection);
+        }
+
+        private void OpenHealthScore()
+        {
+            if (_lastScan == null)
+            {
+                MessageDialog.Show(this, "No scan yet", "Click Scan first - the health score needs a system scan.");
+                return;
+            }
+
+            using var dialog = new HealthScoreForm(HealthScore.Compute(_lastScan));
+            dialog.ShowDialog(this);
         }
 
         private void OpenPresetPicker()

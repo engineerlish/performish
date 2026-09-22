@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Performish.Core.Benchmark;
 using Performish.Core.Scanner;
 using Xunit;
@@ -195,6 +196,49 @@ namespace Performish.Tests
 
             var result = HealthScore.Compute(s);
             Assert.Equal(clean.Score, result.Score);
+        }
+
+        [Fact]
+        public void EveryFactor_HasNonEmptyGuidance_AtFullMarksAndNot()
+        {
+            var full = HealthScore.Compute(PristineSnapshot());
+            Assert.All(full.Factors, f => Assert.False(string.IsNullOrWhiteSpace(f.Guidance)));
+
+            var bloated = PristineSnapshot();
+            for (var i = 0; i < 30; i++) bloated.StartupItems.Add(new StartupItemInfo { Name = "x" + i });
+            bloated.FreeDiskSpaceBytes = 1L * 1024 * 1024 * 1024;
+            bloated.UptimeHours = 500;
+            for (var i = 0; i < 40; i++) bloated.ScheduledTasks.Add(new ScheduledTaskInfo { Path = $@"\Vendor\Task{i}", Enabled = true });
+            for (var i = 0; i < 40; i++) bloated.Services.Add(new ServiceInfo { Name = "svc" + i, Running = true, BinaryPath = $@"C:\Program Files\Vendor{i}\svc.exe" });
+
+            var low = HealthScore.Compute(bloated);
+            Assert.All(low.Factors, f => Assert.False(string.IsNullOrWhiteSpace(f.Guidance)));
+        }
+
+        [Fact]
+        public void UptimeAndServiceFactors_AreNeverMarkedToolCanAct()
+        {
+            var bloated = PristineSnapshot();
+            bloated.UptimeHours = 500;
+            for (var i = 0; i < 40; i++) bloated.ScheduledTasks.Add(new ScheduledTaskInfo { Path = $@"\Vendor\Task{i}", Enabled = true });
+            for (var i = 0; i < 40; i++) bloated.Services.Add(new ServiceInfo { Name = "svc" + i, Running = true, BinaryPath = $@"C:\Program Files\Vendor{i}\svc.exe" });
+
+            var result = HealthScore.Compute(bloated);
+
+            Assert.False(result.Factors.Single(f => f.Name == "Uptime").ToolCanAct);
+            Assert.False(result.Factors.Single(f => f.Name == "Third-party scheduled tasks").ToolCanAct);
+            Assert.False(result.Factors.Single(f => f.Name == "Third-party running services").ToolCanAct);
+        }
+
+        [Fact]
+        public void StartupItemsFactor_IsToolCanAct_WhenBelowFullMarks()
+        {
+            var bloated = PristineSnapshot();
+            for (var i = 0; i < 30; i++) bloated.StartupItems.Add(new StartupItemInfo { Name = "x" + i });
+
+            var result = HealthScore.Compute(bloated);
+
+            Assert.True(result.Factors.Single(f => f.Name == "Startup items").ToolCanAct);
         }
 
         // ---- Path-classification helpers, tested directly ------------------------------------------
