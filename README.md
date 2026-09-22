@@ -41,10 +41,16 @@ workstation or gaming PC for better performance and efficiency.
 - **Change history** - a running log of what's been changed and when.
 - **Drift detection** - checks whether anything Performish set up has
   been reverted by Windows or another program, and offers to reapply it.
-- **Before/after reporting** - measure the effect of a change and export
-  a report.
+- **Real before/after benchmarking** - measures your machine (CPU idle,
+  available memory, disk speed, and more) before and after applying
+  changes and shows exactly what improved, what got worse, and what
+  stayed flat, in real numbers with their measurement variance shown
+  alongside - never an estimate. Works for a single change, a preset, a
+  custom selection, or on its own as a general checkpoint. Every run is
+  saved so you can compare any two checkpoints later, not just the most
+  recent, and results can be exported alongside the rest of a report.
 - **Command-line mode** - run presets unattended from a script or
-  management tool, with the same preview/report options.
+  management tool, with the same preview/report/benchmark options.
 
 ## Requirements
 
