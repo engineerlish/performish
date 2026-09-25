@@ -25,9 +25,24 @@ namespace Performish.Tests
             var result = tweak.Apply(bundle.Context);
 
             Assert.Equal(OperationOutcome.Success, result.Outcome);
-            Assert.Contains("1 MB", result.Message);
+            Assert.Contains("1.0 MB", result.Message);
             Assert.Single(bundle.FileSystem.Files); // only new.tmp remains
             Assert.Equal(@"C:\Cache\new.tmp", bundle.FileSystem.Files[0].Path);
+        }
+
+        [Fact]
+        public void Apply_FreesLessThanOneMegabyte_ReportsFractionalMBInsteadOfZero()
+        {
+            var bundle = FakeContextFactory.Create();
+            bundle.FileSystem.Directories.Add(@"C:\Cache");
+            bundle.FileSystem.Files.Add(new FakeFileSystemBackend.FakeFile { Path = @"C:\Cache\old.tmp", Size = 512 * 1024, LastWriteUtc = DateTime.UtcNow.AddDays(-30) });
+
+            var tweak = MakeCleanupTweak(@"C:\Cache");
+            var result = tweak.Apply(bundle.Context);
+
+            Assert.Equal(OperationOutcome.Success, result.Outcome);
+            Assert.Contains("0.5 MB", result.Message);
+            Assert.DoesNotContain("0 MB", result.Message);
         }
 
         [Fact]

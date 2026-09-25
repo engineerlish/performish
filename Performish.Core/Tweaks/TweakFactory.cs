@@ -235,7 +235,7 @@ namespace Performish.Core.Tweaks
                     return TweakOperationResult.Skipped("None of the target folders exist on this system - nothing to clean.");
 
                 return TweakOperationResult.Success(
-                    $"Freed {totalFreed / 1024 / 1024} MB across {totalDeleted} file(s) ({totalSkipped} skipped - in use or access denied).");
+                    $"Freed {totalFreed / 1024.0 / 1024.0:0.0} MB across {totalDeleted} file(s) ({totalSkipped} skipped - in use or access denied).");
             }
 
             TweakOperationResult Undo(TweakExecutionContext ctx) =>
