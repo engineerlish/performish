@@ -9,6 +9,7 @@ using Performish.Core;
 using Performish.Core.Backup;
 using Performish.Core.Models;
 using Performish.Core.Tweaks;
+using static Performish.ResultPresenter;
 
 namespace Performish.Dialogs
 {
@@ -21,8 +22,6 @@ namespace Performish.Dialogs
     /// dismissed mid-run out from under a live TweakExecutionContext.</summary>
     public sealed class RunningForm : Form
     {
-        private enum ResultStatus { Failed, Skipped, DryRunPreview, Success }
-
         private readonly RichTextBox _log;
         private readonly Label _summaryLabel;
         private readonly ListView _resultsList;
@@ -181,48 +180,6 @@ namespace Performish.Dialogs
 
             if (_log.InvokeRequired) _log.BeginInvoke((Action)Do);
             else Do();
-        }
-
-        // ---- Result classification: color, marker, and grouping order (failed first) --------------
-
-        private static ResultStatus Classify(TweakRunResult r)
-        {
-            if (r.Failed) return ResultStatus.Failed;
-            if (r.Result?.WasDryRun == true) return ResultStatus.DryRunPreview;
-            if (r.Result?.Outcome == OperationOutcome.Skipped) return ResultStatus.Skipped;
-            return ResultStatus.Success;
-        }
-
-        // Sort key: failed first, then skipped, then dry-run previews, then success - "failures ...
-        // can't be missed ... followed by skipped, then successful ones".
-        private static int SortOrder(ResultStatus s) => s switch
-        {
-            ResultStatus.Failed => 0,
-            ResultStatus.Skipped => 1,
-            ResultStatus.DryRunPreview => 2,
-            ResultStatus.Success => 3,
-            _ => 4
-        };
-
-        private static (string Marker, Color Color) StyleFor(ResultStatus status) => status switch
-        {
-            // Never color alone - every row also carries a bracketed text marker, readable in
-            // monochrome and for color-blind users.
-            ResultStatus.Failed => ("[FAILED]", UiStyle.Error),
-            ResultStatus.Skipped => ("[SKIPPED]", UiStyle.Dim),
-            ResultStatus.DryRunPreview => ("[DRY RUN]", UiStyle.GradientMid), // distinct from success green
-            ResultStatus.Success => ("[OK]", UiStyle.Accent),
-            _ => ("[?]", UiStyle.Dim)
-        };
-
-        /// <summary>One line, never a raw stack trace - "a short reason (one line)". Exception
-        /// messages can be long/multi-line (e.g. a Win32Exception with an inner exception chain);
-        /// this keeps only the first line and caps length.</summary>
-        private static string ShortReason(TweakRunResult r)
-        {
-            var message = r.Result?.Message ?? r.Exception?.Message ?? "";
-            var firstLine = message.Split('\n')[0].Trim().TrimEnd('\r');
-            return firstLine.Length > 100 ? firstLine.Substring(0, 97) + "..." : firstLine;
         }
 
         // ---- Results view ------------------------------------------------------------------------

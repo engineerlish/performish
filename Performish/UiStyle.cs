@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using Performish.Core.Models;
 
@@ -25,9 +26,32 @@ namespace Performish
         public static readonly Color ButtonBorder = Color.FromArgb(60, 64, 60);
         public static readonly Color DisabledText = Color.FromArgb(90, 90, 90);
 
-        public static readonly Font Mono = new Font("Consolas", 9.5f);
-        public static readonly Font MonoBold = new Font("Consolas", 9.5f, FontStyle.Bold);
-        public static readonly Font MonoSmall = new Font("Consolas", 9f);
+        public static readonly Color Panel2 = Color.FromArgb(28, 32, 28);
+        public static readonly Color Line = Color.FromArgb(46, 51, 46);
+        public static readonly Color LineHi = Color.FromArgb(96, 104, 96);
+        public static readonly Color Faint = Color.FromArgb(110, 116, 110);
+        public static readonly Color AccentDim = Color.FromArgb(22, 58, 36);
+        public static readonly Color ErrDim = Color.FromArgb(58, 24, 24);
+
+        /// <summary>Cascadia Mono (ships with Windows Terminal, the Windows 11 default terminal) when
+        /// installed, else Consolas (ships with every Windows). Nothing to install either way.</summary>
+        public static readonly string FontFamily = PickFontFamily();
+        public static readonly Font Mono = new Font(FontFamily, 9.5f);
+        public static readonly Font MonoBold = new Font(FontFamily, 9.5f, FontStyle.Bold);
+        public static readonly Font MonoSmall = new Font(FontFamily, 9f);
+        public static readonly Font Big = new Font(FontFamily, 15f, FontStyle.Bold);
+        public static readonly Font Huge = new Font(FontFamily, 34f, FontStyle.Bold);
+
+        private static string PickFontFamily()
+        {
+            using var installed = new System.Drawing.Text.InstalledFontCollection();
+            foreach (var name in new[] { "Cascadia Mono", "Consolas" })
+                if (installed.Families.Any(f => f.Name == name)) return name;
+            return "Courier New";
+        }
+
+        /// <summary>Width in pixels of one character of the monospace body font.</summary>
+        public static int CharWidth => TextRenderer.MeasureText("0000000000", Mono, new Size(9999, 99), TextFormatFlags.NoPadding).Width / 10;
 
         /// <summary>A consistently-styled push button: flat, dark, accent-colored border, visible
         /// keyboard focus (FlatAppearance.BorderSize grows via focus handlers below) and hover/pressed
@@ -50,6 +74,7 @@ namespace Performish
                 Margin = new Padding(4),
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false,
+                UseMnemonic = false, // labels like "Review & apply" must show the ampersand literally
                 TabStop = true
             };
             button.FlatAppearance.BorderColor = ButtonBorder;
@@ -95,11 +120,32 @@ namespace Performish
                 BackColor = Background,
                 Font = bold ? MonoBold : Mono,
                 AutoSize = true,
+                UseMnemonic = false,
                 Margin = new Padding(4)
             };
         }
 
+        [System.Runtime.InteropServices.DllImport("uxtheme.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int SetWindowTheme(System.IntPtr hwnd, string subAppName, string subIdList);
+
+        /// <summary>Gives a scrollable control Windows' dark scrollbars/selection chrome instead of the
+        /// bright default ones that clash with the black UI. Best effort: silently does nothing where the
+        /// dark theme is unavailable.</summary>
+        public static void UseDarkScrollbars(Control control)
+        {
+            void Apply() { try { SetWindowTheme(control.Handle, "DarkMode_Explorer", null); } catch { } }
+            if (control.IsHandleCreated) Apply();
+            control.HandleCreated += (s, e) => Apply();
+        }
+
         public static RichTextBox MakeConsole()
+        {
+            var console = MakeConsoleCore();
+            UseDarkScrollbars(console);
+            return console;
+        }
+
+        private static RichTextBox MakeConsoleCore()
         {
             return new RichTextBox
             {
