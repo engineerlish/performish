@@ -43,6 +43,10 @@ namespace Performish.Views
 
             Console = UiStyle.MakeConsole();
             Console.AccessibleName = "Status and log";
+            // Long status lines wrap instead of scrolling sideways; the banner already falls back to a
+            // compact form when it would not fit, so it never wraps.
+            Console.WordWrap = true;
+            Console.ScrollBars = RichTextBoxScrollBars.Vertical;
             _left = new Panel { Dock = DockStyle.Fill, BackColor = UiStyle.Background, Padding = new Padding(24, 16, 12, 8) };
             _left.Controls.Add(Console);
 
