@@ -17,140 +17,6 @@ namespace Performish.Tests
     {
         private static AppServices FakeServices() => AppServices.BuildFake();
 
-        [StaFact]
-        public void TweakBrowser_StartsWithNoSelection_ReviewButtonDisabled()
-        {
-            var services = FakeServices();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
-            form.Show();
-
-            Assert.False(form.ReviewButton.Enabled);
-            Assert.Empty(form.SelectedIds);
-        }
-
-        [StaFact]
-        public void TweakBrowser_CheckingAnItem_EnablesReviewButtonAndTracksSelection()
-        {
-            var services = FakeServices();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
-            form.Show();
-
-            var firstTweak = form.VisibleTweaks[0];
-            form.SetChecked(firstTweak.Id, true);
-
-            Assert.True(form.ReviewButton.Enabled);
-            Assert.Contains(firstTweak.Id, form.SelectedIds);
-        }
-
-        [StaFact]
-        public void TweakBrowser_UncheckingAnItem_RemovesItAndCanDisableReviewButtonAgain()
-        {
-            var services = FakeServices();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
-            form.Show();
-
-            var firstTweak = form.VisibleTweaks[0];
-            form.SetChecked(firstTweak.Id, true);
-            Assert.True(form.ReviewButton.Enabled);
-
-            form.SetChecked(firstTweak.Id, false);
-
-            Assert.False(form.ReviewButton.Enabled);
-            Assert.DoesNotContain(firstTweak.Id, form.SelectedIds);
-        }
-
-        [StaFact]
-        public void TweakBrowser_ClickingReviewWithSelection_PopulatesConfirmedSelectionAndClosesOk()
-        {
-            var services = FakeServices();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
-            form.Show();
-
-            var firstTweak = form.VisibleTweaks[0];
-            form.SetChecked(firstTweak.Id, true);
-            form.ReviewButton.PerformClick();
-
-            Assert.Equal(System.Windows.Forms.DialogResult.OK, form.DialogResult);
-            Assert.Single(form.ConfirmedSelection);
-            Assert.Equal(firstTweak.Id, form.ConfirmedSelection[0].Id);
-        }
-
-        [StaFact]
-        public void TweakBrowser_CategoryFilter_OnlyShowsThatCategory()
-        {
-            var services = FakeServices();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
-            form.Show();
-
-            form.ClickCategory(TweakCategory.Network);
-
-            Assert.NotEmpty(form.VisibleTweaks);
-            Assert.All(form.VisibleTweaks, t => Assert.Equal(TweakCategory.Network, t.Category));
-        }
-
-        [StaFact]
-        public void TweakBrowser_PreselectedIds_StartCheckedAndReviewButtonEnabled()
-        {
-            var services = FakeServices();
-            var preselected = services.TweakRegistry.All.Take(2).Select(t => t.Id).ToList();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, preselected, null);
-            form.Show();
-
-            Assert.True(form.ReviewButton.Enabled);
-            Assert.Equal(2, form.SelectedIds.Count);
-        }
-
-        // ---- Part 1 regression: list rows must never show the type name or a raw id ----------------
-
-        [StaFact]
-        public void TweakBrowser_EveryVisibleTweak_RowTextShowsTitleNeverTypeNameOrRawId()
-        {
-            var services = FakeServices();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
-            form.Show();
-
-            Assert.NotEmpty(form.VisibleTweaks);
-            foreach (var tweak in form.VisibleTweaks)
-            {
-                var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
-                Assert.DoesNotContain("Performish.Core.Models", rowText);
-                Assert.DoesNotContain("TweakDefinition", rowText);
-                Assert.DoesNotContain(tweak.Id, rowText);
-                Assert.Contains(tweak.Title, rowText);
-            }
-        }
-
-        [StaFact]
-        public void TweakBrowser_EveryCategoryAndSearchResult_RowsContainNoTypeNameOrRawId()
-        {
-            var services = FakeServices();
-            using var form = new TweakBrowserForm(services.TweakRegistry.All, services, Enumerable.Empty<string>(), null);
-            form.Show();
-
-            void AssertCurrentViewIsClean()
-            {
-                Assert.NotEmpty(form.VisibleTweaks);
-                foreach (var tweak in form.VisibleTweaks)
-                {
-                    var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
-                    Assert.DoesNotContain("Performish.Core.Models", rowText);
-                    Assert.DoesNotContain(tweak.Id, rowText);
-                }
-            }
-
-            foreach (var category in new TweakCategory?[]
-                     { null, TweakCategory.Debloat, TweakCategory.Performance, TweakCategory.Gaming,
-                       TweakCategory.Network, TweakCategory.Maintenance })
-            {
-                form.ClickCategory(category);
-                AssertCurrentViewIsClean();
-            }
-
-            form.ClickCategory(null);
-            form.SetSearchText("disable");
-            AssertCurrentViewIsClean();
-        }
-
         [Fact]
         public void TweakDefinition_ToString_ReturnsTitleNeverTheTypeName()
         {
@@ -173,26 +39,6 @@ namespace Performish.Tests
             Assert.Equal("[Untitled tweak]", tweak.ToString());
             Assert.Equal("[Untitled tweak]", TweakDefinition.UntitledPlaceholder);
 
-            var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
-            Assert.Contains("[Untitled tweak]", rowText);
-            Assert.DoesNotContain("Performish.Core.Models", rowText);
-        }
-
-        [Fact]
-        public void TweakBrowser_LongTitle_IsTruncatedWithEllipsis_NotWrapped()
-        {
-            var longTitle = "Disable the extremely long and verbose setting that goes on for a very long time indeed";
-            Assert.True(longTitle.Length > TweakBrowserForm.TitleColumnWidth);
-
-            var tweak = new TweakDefinition("t1", longTitle, "desc", TweakCategory.Debloat,
-                RiskLevel.Safe, TweakScope.CurrentUser, false, "source",
-                _ => TweakState.Unknown, _ => TweakOperationResult.Success("ok"), _ => TweakOperationResult.Skipped("n/a"));
-
-            var rowText = TweakBrowserForm.BuildRowText(tweak, TweakState.Unknown);
-
-            Assert.Contains("…", rowText); // ellipsis, not a wrapped/multi-line title
-            Assert.DoesNotContain(longTitle, rowText); // the full title must not appear un-truncated
-            Assert.DoesNotContain("\n", rowText);
         }
 
         [StaFact]
@@ -231,19 +77,6 @@ namespace Performish.Tests
 
             Assert.Same(form.CancelActionButton, form.ActiveControl);
             Assert.Same(form.CancelActionButton, form.CancelButton);
-        }
-
-        [StaFact]
-        public void PresetPicker_ClickingBalanced_SetsChosenAndDialogResultOk()
-        {
-            var services = FakeServices();
-            using var form = new PresetPickerForm(services.TweakRegistry);
-            form.Show();
-
-            form.ClickPreset(Preset.Balanced);
-
-            Assert.Equal(Preset.Balanced, form.Chosen);
-            Assert.Equal(System.Windows.Forms.DialogResult.OK, form.DialogResult);
         }
     }
 }

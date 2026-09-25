@@ -35,6 +35,10 @@ workstation or gaming PC for better performance and efficiency.
   applied.
 - **Undo and revert** - undo an individual change or revert everything
   in one click.
+- **One window** - browsing tweaks, choosing a preset, confirming, and
+  reading the results all happen inside the main window: a paged grid
+  of tweak cards with details underneath, a small confirmation card
+  before anything is applied, and no pop-up windows for those steps.
 - **Clear results** - after applying changes, see at a glance what
   succeeded, what failed, and what was skipped, with failures shown
   first, a short reason for each, and the option to retry.
@@ -64,7 +68,8 @@ workstation or gaming PC for better performance and efficiency.
 1. Download or build the Performish executable.
 2. Run it as Administrator.
 3. Run a scan to see your system's current state.
-4. Choose a preset or pick individual tweaks, preview them, and apply.
+4. Open Tweaks (F2), choose a preset or pick individual tweaks, review
+   them, and apply. Keep Dry run on to preview first.
 
 ## Safety
 

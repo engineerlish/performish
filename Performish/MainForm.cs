@@ -11,13 +11,15 @@ using Performish.Core.Scanner;
 using Performish.Core.Reporting;
 using Performish.Core.Tweaks;
 using Performish.Dialogs;
+using Performish.Views;
 
 namespace Performish
 {
-    /// <summary>Home screen: banner + system summary + status, and the primary action buttons.
-    /// Everything that used to be a keybind-driven sub-screen (browse tweaks, presets, history,
-    /// confirm, running, revert-confirm) is now a separate modal dialog under Dialogs/ - see
-    /// DECISIONS.md "keybinds to buttons" for the full old-key -> new-button mapping.</summary>
+    /// <summary>The main window: a left navigation rail (Home / Tweaks / Results) and one content area
+    /// that swaps between in-window views under Views/. Browsing and choosing tweaks, the apply
+    /// confirmation, and the apply/undo results all happen in this window (no popups); the smaller
+    /// utility dialogs (health score, startup items, history, benchmarks, settings) remain modal
+    /// dialogs under Dialogs/.</summary>
     public sealed class MainForm : Form
     {
         // Neither is constructed here anymore (see OnFirstShownAsync): AppSettings.Load() and
@@ -29,6 +31,15 @@ namespace Performish
         private AppSettings _settings;
         private AppServices _services;
 
+        private enum ViewKind { Home, Tweaks, Results }
+
+        private HomeView _home;
+        private TweaksView _tweaks;
+        private ResultsView _results;
+        private ConfirmOverlay _overlay;
+        private Panel _content, _nav;
+        private readonly Dictionary<ViewKind, Button> _navButtons = new Dictionary<ViewKind, Button>();
+        private ViewKind _currentView = ViewKind.Home;
         private RichTextBox _console;
         private FlowLayoutPanel _buttonPanel;
         private CheckBox _dryRunCheckBox;
@@ -48,11 +59,26 @@ namespace Performish
         private BenchmarkComparison _lastBenchmark;
         private BenchmarkComparisonReport _lastRealBenchmark;
 
+        // Set only by the (services, settings) constructor below, so tests can run the whole window
+        // against fake backends and never touch AppServices.BuildReal().
+        private readonly (AppSettings Settings, AppServices Services)? _injected;
+
+        /// <summary>Builds the window around already-constructed services/settings (used by tests with
+        /// AppServices.BuildFake()). The parameterless constructor loads the real ones after first paint.</summary>
+        public MainForm(AppServices services, AppSettings settings) : this()
+        {
+            _injected = (settings, services);
+        }
+
+        /// <summary>Test hook: runs the same post-first-paint initialization the Shown event runs.</summary>
+        public Task InitializeForTestingAsync() => OnFirstShownAsync();
+
         public MainForm()
         {
             Text = "Performish";
-            Width = 1040;
-            Height = 680;
+            Width = 1320;
+            Height = 820;
+            MinimumSize = new Size(1040, 680);
             BackColor = UiStyle.Background;
             Font = UiStyle.Mono;
             StartPosition = FormStartPosition.CenterScreen;
@@ -65,14 +91,15 @@ namespace Performish
 
         private void BuildLayout()
         {
-            _console = UiStyle.MakeConsole();
+            _home = new HomeView { Dock = DockStyle.Fill };
+            _console = _home.Console;
 
             _buttonPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
                 AutoSize = true,
                 BackColor = UiStyle.Background,
-                Padding = new Padding(10),
+                Padding = new Padding(0),
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false
             };
@@ -157,14 +184,110 @@ namespace Performish
                 runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton, benchmarkButton));
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("History & reports",
                 historyButton, reportButton));
-            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Options",
-                settingsButton, _dryRunCheckBox));
+            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Options", settingsButton));
+            _home.AddBottom(_buttonPanel);
 
-            var host = new Panel { Dock = DockStyle.Fill, BackColor = UiStyle.Background, Padding = new Padding(12) };
-            host.Controls.Add(_console);
+            _results = new ResultsView { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(24, 16, 24, 0) };
+            _results.BackRequested += () => ShowView(_tweaks != null ? ViewKind.Tweaks : ViewKind.Home);
+            _results.ExportRequested += ExportReport;
+            _overlay = new ConfirmOverlay();
 
-            Controls.Add(host);
-            Controls.Add(_buttonPanel);
+            _content = new Panel { Dock = DockStyle.Fill, BackColor = UiStyle.Background };
+            _content.Controls.Add(_home);
+            _content.Controls.Add(_results);
+            _content.Controls.Add(_overlay);
+
+            BuildNavRail();
+            Controls.Add(_content);
+            Controls.Add(_nav);
+            ShowView(ViewKind.Home);
+        }
+
+        private void BuildNavRail()
+        {
+            _nav = new Panel { Dock = DockStyle.Left, Width = 184, BackColor = UiStyle.Panel };
+            _nav.Paint += (s, e) => { using var p = new Pen(UiStyle.Line); e.Graphics.DrawLine(p, _nav.Width - 1, 0, _nav.Width - 1, _nav.Height); };
+
+            var mark = new Label { Text = "performish", Font = UiStyle.MonoBold, ForeColor = UiStyle.Accent, BackColor = UiStyle.Panel, AutoSize = true, Location = new Point(18, 20), AccessibleName = "Performish" };
+            var cursor = new Panel { BackColor = UiStyle.Accent, Size = new Size(8, UiStyle.Mono.Height - 2), Location = new Point(18 + 10 * UiStyle.CharWidth + 8, 22), TabStop = false };
+            _nav.Controls.Add(mark);
+            _nav.Controls.Add(cursor);
+
+            int y = 76;
+            foreach (var (kind, label, key) in new[] { (ViewKind.Home, "Home", "F1"), (ViewKind.Tweaks, "Tweaks", "F2"), (ViewKind.Results, "Results", "F3") })
+            {
+                var k = kind;
+                var button = new Button
+                {
+                    Text = label,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = UiStyle.Mono,
+                    ForeColor = UiStyle.Dim,
+                    BackColor = UiStyle.Panel,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Padding = new Padding(16, 0, 0, 0),
+                    Size = new Size(_nav.Width - 1, 42),
+                    Location = new Point(0, y),
+                    UseMnemonic = false,
+                    UseVisualStyleBackColor = false,
+                    Cursor = Cursors.Hand,
+                    AccessibleName = label,
+                    AccessibleDescription = $"Show the {label} screen ({key})"
+                };
+                button.FlatAppearance.BorderSize = 0;
+                button.FlatAppearance.MouseOverBackColor = UiStyle.Panel2;
+                button.FlatAppearance.MouseDownBackColor = UiStyle.ButtonPressed;
+                button.Click += (s, e) => ShowView(k);
+                var hint = new Label { Text = key, Font = UiStyle.MonoSmall, ForeColor = UiStyle.Faint, BackColor = Color.Transparent, AutoSize = true, Enabled = false };
+                button.Controls.Add(hint);
+                hint.Location = new Point(button.Width - 40, 13);
+                _navButtons[kind] = button;
+                _nav.Controls.Add(button);
+                y += 46;
+            }
+
+            var dryBox = new Panel { Dock = DockStyle.Bottom, Height = 128, BackColor = UiStyle.Panel, Padding = new Padding(14, 10, 10, 10) };
+            var note = new Label { Text = "With dry run on, nothing on this machine changes.", ForeColor = UiStyle.Faint, Font = UiStyle.MonoSmall, BackColor = UiStyle.Panel, Dock = DockStyle.Fill };
+            _dryRunCheckBox.BackColor = UiStyle.Panel;
+            _dryRunCheckBox.AutoSize = false;
+            _dryRunCheckBox.Dock = DockStyle.Top;
+            _dryRunCheckBox.Height = 44;
+            _dryRunCheckBox.Text = "Dry run";
+            dryBox.Controls.Add(note);
+            dryBox.Controls.Add(_dryRunCheckBox);
+            _nav.Controls.Add(dryBox);
+        }
+
+        private void ShowView(ViewKind view)
+        {
+            if (view == ViewKind.Tweaks && _tweaks == null) view = ViewKind.Home; // not loaded yet
+            _currentView = view;
+            _home.Visible = view == ViewKind.Home;
+            if (_tweaks != null) _tweaks.Visible = view == ViewKind.Tweaks;
+            _results.Visible = view == ViewKind.Results;
+            foreach (var (kind, button) in _navButtons)
+            {
+                bool active = kind == view;
+                button.BackColor = active ? UiStyle.Panel2 : UiStyle.Panel;
+                button.ForeColor = active ? UiStyle.Foreground : UiStyle.Dim;
+                button.Font = active ? UiStyle.MonoBold : UiStyle.Mono;
+                button.AccessibleName = active ? $"{button.Text}, current screen" : button.Text;
+            }
+            _overlay.BringToFront();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (!_overlay.IsOpen)
+            {
+                switch (keyData)
+                {
+                    case Keys.F1: ShowView(ViewKind.Home); return true;
+                    case Keys.F2: ShowView(ViewKind.Tweaks); return true;
+                    case Keys.F3: ShowView(ViewKind.Results); return true;
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private bool DryRun => _dryRunCheckBox.Checked;
@@ -175,7 +298,7 @@ namespace Performish
         {
             RenderHome(); // banner + "initializing" line visible immediately, zero I/O done yet
 
-            var (settings, services) = await Task.Run(() => (AppSettings.Load(), AppServices.BuildReal()));
+            var (settings, services) = _injected ?? await Task.Run(() => (AppSettings.Load(), AppServices.BuildReal()));
             _settings = settings;
             _services = services;
             _dryRunCheckBox.Checked = _settings.DryRunByDefault;
@@ -183,6 +306,16 @@ namespace Performish
 
             foreach (var c in _actionControls) c.Enabled = true;
             _revertButton.Enabled = false; // still needs UpdateRevertButtonState() below
+
+            _tweaks = new TweaksView(_services.TweakRegistry.All, _services, Enumerable.Empty<string>(), null)
+            {
+                Dock = DockStyle.Fill,
+                Visible = false,
+                Padding = new Padding(24, 12, 24, 0)
+            };
+            _tweaks.ReviewRequested += selection => _ = ReviewAndApplyAsync(selection);
+            _content.Controls.Add(_tweaks);
+            ShowView(_currentView);
 
             RenderHome();
             UpdateRevertButtonState();
@@ -233,7 +366,10 @@ namespace Performish
             AppendLine("", UiStyle.Foreground);
 
             if (_lastScan == null)
+            {
+                _home.ShowNoScan();
                 AppendLine("  No scan yet - click Scan to read this machine (read-only, nothing changes).", UiStyle.Dim);
+            }
             else
                 PrintScanSummary(_lastScan);
         }
@@ -247,41 +383,12 @@ namespace Performish
                 AppendLine(line, UiStyle.Accent);
         }
 
+        /// <summary>The numeric summary now lives in the home screen's system/health panel; the console
+        /// keeps only what needs a sentence of explanation.</summary>
         private void PrintScanSummary(SystemSnapshot s)
         {
-            var health = HealthScore.Compute(s);
-            AppendLine("  health score:", UiStyle.Dim, false);
-            AppendLine($"{health.Score}/{HealthScore.TotalMax}  (" +
-                string.Join(", ", health.Factors.Select(f => $"{f.Name}: {f.Points}/{f.MaxPoints}")) + ")",
-                health.Score >= 75 ? UiStyle.Accent : (health.Score >= 50 ? UiStyle.GradientMid : UiStyle.Error));
-
-            AppendLine("  system:      ", UiStyle.Dim, false);
-            AppendLine($"{s.WindowsProductName} ({s.WindowsEdition}), build {s.BuildNumber}.{s.UpdateBuildRevision}" +
-                (s.IsWindows11 ? "" : "  [NOT Windows 11 - some tweaks may not apply]"),
-                s.IsWindows11 ? UiStyle.Foreground : UiStyle.Error);
-
-            AppendLine("  cpu:         ", UiStyle.Dim, false);
-            AppendLine($"{s.CpuName}  ({s.CpuCoreCount} cores / {s.CpuLogicalProcessorCount} threads)", UiStyle.Foreground);
-
-            AppendLine("  gpu:         ", UiStyle.Dim, false);
-            AppendLine(s.Gpus.Count == 0 ? "(none detected)" : string.Join(", ", s.Gpus.Select(g => $"{g.Name} [{g.Vendor}] driver {g.DriverVersion}")), UiStyle.Foreground);
-
-            AppendLine("  memory:      ", UiStyle.Dim, false);
-            AppendLine($"{FormatBytes(s.UsedRamBytes)} used / {FormatBytes(s.TotalRamBytes)} total", UiStyle.Foreground);
-
-            AppendLine("  power plan:  ", UiStyle.Dim, false);
-            AppendLine(s.ActivePowerPlanName + (s.IsLaptop ? "  (laptop - battery-sensitive tweaks are flagged)" : ""), UiStyle.Foreground);
-
-            AppendLine("  processes:   ", UiStyle.Dim, false);
-            AppendLine($"{s.ProcessCount} running, {s.Services.Count(sv => sv.Running)} services running, {s.StartupItems.Count} startup item(s)", UiStyle.Foreground);
-
-            AppendLine("  disk (C:):   ", UiStyle.Dim, false);
-            var freePct = s.TotalDiskSpaceBytes > 0 ? (double)s.FreeDiskSpaceBytes / s.TotalDiskSpaceBytes * 100.0 : 0;
-            AppendLine($"{FormatBytes(s.FreeDiskSpaceBytes)} free of {FormatBytes(s.TotalDiskSpaceBytes)} ({freePct:0.0}% free)",
-                freePct < 10 ? UiStyle.Error : UiStyle.Foreground);
-
-            AppendLine("  uptime:      ", UiStyle.Dim, false);
-            AppendLine($"{s.UptimeHours:0.0} hour(s)", UiStyle.Foreground);
+            _home.ShowScan(s);
+            AppendLine("  Scan complete. The system and health panel on the right has the details.", UiStyle.Accent);
 
             if (s.IsDomainJoined || s.IsMdmManaged)
             {
@@ -323,6 +430,7 @@ namespace Performish
         private void SetBusy(bool busy)
         {
             foreach (var c in _actionControls) c.Enabled = !busy;
+            _tweaks?.SetBusy(busy);
             // The blanket enable above would incorrectly re-enable "Revert everything" even when
             // nothing is applied - re-derive its real state immediately after.
             if (!busy) UpdateRevertButtonState();
@@ -332,9 +440,9 @@ namespace Performish
 
         private void OpenBrowser(TweakCategory? category)
         {
-            using var dialog = new TweakBrowserForm(_services.TweakRegistry.All, _services, Enumerable.Empty<string>(), category);
-            if (dialog.ShowDialog(this) == DialogResult.OK && dialog.ConfirmedSelection.Count > 0)
-                _ = ReviewAndApplyAsync(dialog.ConfirmedSelection);
+            if (_tweaks == null) return;
+            _tweaks.ShowCategory(category);
+            ShowView(ViewKind.Tweaks);
         }
 
         private void OpenStartupItems()
@@ -463,13 +571,24 @@ namespace Performish
 
         private void OpenPresetPicker()
         {
-            using var dialog = new PresetPickerForm(_services.TweakRegistry);
-            if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Chosen == null) return;
+            if (_tweaks == null) return;
+            ShowView(ViewKind.Tweaks);
+            _tweaks.FocusPresets();
+        }
 
-            var presetIds = _services.TweakRegistry.ByPreset(dialog.Chosen.Value).Select(t => t.Id);
-            using var browser = new TweakBrowserForm(_services.TweakRegistry.All, _services, presetIds, null);
-            if (browser.ShowDialog(this) == DialogResult.OK && browser.ConfirmedSelection.Count > 0)
-                _ = ReviewAndApplyAsync(browser.ConfirmedSelection);
+        /// <summary>The in-window confirmation card (see ConfirmOverlay). Danger styling when the action
+        /// is real (not a dry run).</summary>
+        private Task<bool> ConfirmAsync(string title, IEnumerable<(string Text, Color Color)> lines, string confirmLabel, string cancelLabel, bool danger)
+        {
+            return _overlay.ShowAsync(_content, title, lines, confirmLabel, cancelLabel, danger);
+        }
+
+        /// <summary>Runs a batch in the in-window Results view.</summary>
+        private Task<BatchRunResult> RunBatchAsync(string title, IReadOnlyList<TweakDefinition> tweaks,
+            Performish.Core.Backup.ChangeLogAction action, bool dryRun, bool wantsRestorePoint = false)
+        {
+            ShowView(ViewKind.Results);
+            return _results.RunAsync(_services, title, tweaks, action, dryRun, wantsRestorePoint);
         }
 
         private async Task ReviewAndApplyAsync(System.Collections.Generic.List<TweakDefinition> selection)
@@ -480,6 +599,8 @@ namespace Performish
                     DryRun ? UiStyle.BrightAccent : UiStyle.Error),
                 ("", UiStyle.Foreground)
             };
+            lines.Insert(1, ($"{selection.Count} tweak(s): {selection.Count(t => t.Risk == RiskLevel.Safe)} safe, " +
+                $"{selection.Count(t => t.Risk == RiskLevel.Moderate)} moderate, {selection.Count(t => t.Risk == RiskLevel.Advanced)} advanced", UiStyle.Foreground));
             foreach (var t in selection.OrderBy(t => t.Risk))
             {
                 lines.Add(($"[{UiStyle.RiskTag(t.Risk)}] {t.Title}", UiStyle.ColorForRisk(t.Risk)));
@@ -511,57 +632,67 @@ namespace Performish
                     "change with the \"Benchmark:\" button.", UiStyle.Dim));
             }
 
-            var confirmed = ConfirmDialogForm.Show(this, "Review & apply", lines, "Apply", "Cancel");
+            var confirmed = await ConfirmAsync(DryRun ? $"Run a dry run of {selection.Count} tweaks?" : $"Apply {selection.Count} tweaks for real?",
+                lines, DryRun ? "Run dry run" : "Apply now", "Cancel", danger: !DryRun);
             if (!confirmed) return;
 
-            var wantsRestorePoint = _settings.CreateRestorePointByDefault && selection.Any(t => t.Risk != RiskLevel.Safe);
-            var dryRun = DryRun;
-            var tweakIds = selection.Select(t => t.Id).ToList();
-            var pairId = Guid.NewGuid().ToString("N");
-
-            BenchmarkSnapshot before = null;
-            if (!dryRun)
-                before = BenchmarkSnapshot.FromSystemSnapshot(await Task.Run(() => _services.Scanner.Scan()));
-
-            var beforeHealthScore = _lastScan != null ? HealthScore.Compute(_lastScan).Score : (int?)null;
-            var benchmarkBaseline = await CaptureBenchmarkAsync(BenchmarkRunKind.Baseline,
-                $"Before: {DescribeSelection(selection)}", tweakIds, isDryRunPreview: dryRun, beforeHealthScore, pairId);
-
-            var batchResult = await RunningForm.RunAsync(this, "Applying",
-                _services, selection, Performish.Core.Backup.ChangeLogAction.Apply, dryRun, wantsRestorePoint);
-
-            _lastBatchResults = batchResult.Results;
-            _lastBatchWasDryRun = dryRun;
-            _lastBenchmark = null;
-            _lastRealBenchmark = null;
-
-            if (!dryRun && before != null)
+            SetBusy(true);
+            try
             {
-                var afterScan = await Task.Run(() => _services.Scanner.Scan());
-                var after = BenchmarkSnapshot.FromSystemSnapshot(afterScan);
-                _lastBenchmark = new BenchmarkComparison { Before = before, After = after };
-                ShowBenchmarkComparison(_lastBenchmark);
+                var wantsRestorePoint = _settings.CreateRestorePointByDefault && selection.Any(t => t.Risk != RiskLevel.Safe);
+                var dryRun = DryRun;
+                var tweakIds = selection.Select(t => t.Id).ToList();
+                var pairId = Guid.NewGuid().ToString("N");
 
-                if (benchmarkBaseline != null)
+                BenchmarkSnapshot before = null;
+                if (!dryRun)
+                    before = BenchmarkSnapshot.FromSystemSnapshot(await Task.Run(() => _services.Scanner.Scan()));
+
+                var beforeHealthScore = _lastScan != null ? HealthScore.Compute(_lastScan).Score : (int?)null;
+                var benchmarkBaseline = await CaptureBenchmarkAsync(BenchmarkRunKind.Baseline,
+                    $"Before: {DescribeSelection(selection)}", tweakIds, isDryRunPreview: dryRun, beforeHealthScore, pairId);
+
+                var batchResult = await RunBatchAsync($"Applying {selection.Count} tweak(s)...", selection,
+                    Performish.Core.Backup.ChangeLogAction.Apply, dryRun, wantsRestorePoint);
+
+                _lastBatchResults = batchResult.Results;
+                _lastBatchWasDryRun = dryRun;
+                _lastBenchmark = null;
+                _lastRealBenchmark = null;
+
+                if (!dryRun && before != null)
                 {
-                    var afterHealthScore = HealthScore.Compute(afterScan).Score;
-                    var benchmarkAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
-                        $"After: {DescribeSelection(selection)}", tweakIds, isDryRunPreview: false, afterHealthScore, pairId);
-                    ShowBenchmarkComparisonDialog(benchmarkBaseline, benchmarkAfter);
-                }
-            }
-            else if (benchmarkBaseline != null)
-            {
-                // Dry run: nothing real changed, so there's nothing real to measure "after" - the
-                // comparison dialog shows this plainly rather than fabricating a result (see
-                // BenchmarkSuiteRunner.Run/BenchmarkComparer's dry-run handling).
-                var dryRunAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
-                    $"After (dry run): {DescribeSelection(selection)}", tweakIds, isDryRunPreview: true, null, pairId);
-                ShowBenchmarkComparisonDialog(benchmarkBaseline, dryRunAfter);
-            }
+                    var afterScan = await Task.Run(() => _services.Scanner.Scan());
+                    var after = BenchmarkSnapshot.FromSystemSnapshot(afterScan);
+                    _lastBenchmark = new BenchmarkComparison { Before = before, After = after };
+                    ShowBenchmarkComparison(_lastBenchmark);
 
-            UpdateRevertButtonState();
-            RenderHome();
+                    if (benchmarkBaseline != null)
+                    {
+                        var afterHealthScore = HealthScore.Compute(afterScan).Score;
+                        var benchmarkAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
+                            $"After: {DescribeSelection(selection)}", tweakIds, isDryRunPreview: false, afterHealthScore, pairId);
+                        ShowBenchmarkComparisonDialog(benchmarkBaseline, benchmarkAfter);
+                    }
+                }
+                else if (benchmarkBaseline != null)
+                {
+                    // Dry run: nothing real changed, so there's nothing real to measure "after" - the
+                    // comparison dialog shows this plainly rather than fabricating a result (see
+                    // BenchmarkSuiteRunner.Run/BenchmarkComparer's dry-run handling).
+                    var dryRunAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
+                        $"After (dry run): {DescribeSelection(selection)}", tweakIds, isDryRunPreview: true, null, pairId);
+                    ShowBenchmarkComparisonDialog(benchmarkBaseline, dryRunAfter);
+                }
+
+                _tweaks?.InvalidateStates();
+                UpdateRevertButtonState();
+                RenderHome();
+            }
+            finally
+            {
+                SetBusy(false);
+            }
         }
 
         private static string DescribeSelection(System.Collections.Generic.List<TweakDefinition> selection) =>
@@ -590,35 +721,44 @@ namespace Performish
             lines.Add(($"Mode: {(DryRun ? "DRY RUN (nothing will actually change)" : "REAL - these changes will be reverted")}",
                 DryRun ? UiStyle.BrightAccent : UiStyle.Error));
 
-            var confirmed = ConfirmDialogForm.Show(this, "Revert everything", lines, "Revert", "Cancel");
+            var confirmed = await ConfirmAsync("Revert everything?", lines, DryRun ? "Run dry run" : "Revert", "Cancel", danger: !DryRun);
             if (!confirmed) return;
 
-            var dryRun = DryRun;
-            var tweakIds = toRevert.Select(t => t.Id).ToList();
-            var pairId = Guid.NewGuid().ToString("N");
-            var beforeHealthScore = _lastScan != null ? HealthScore.Compute(_lastScan).Score : (int?)null;
-            var benchmarkBaseline = await CaptureBenchmarkAsync(BenchmarkRunKind.Baseline,
-                "Before: revert everything", tweakIds, isDryRunPreview: dryRun, beforeHealthScore, pairId);
-
-            var batchResult = await RunningForm.RunAsync(this, "Reverting",
-                _services, toRevert, Performish.Core.Backup.ChangeLogAction.Undo, dryRun);
-
-            _lastBatchResults = batchResult.Results;
-            _lastBatchWasDryRun = dryRun;
-            _lastBenchmark = null;
-            _lastRealBenchmark = null;
-
-            if (benchmarkBaseline != null)
+            SetBusy(true);
+            try
             {
-                int? afterHealthScore = null;
-                if (!dryRun) afterHealthScore = HealthScore.Compute(await Task.Run(() => _services.Scanner.Scan())).Score;
-                var benchmarkAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
-                    "After: revert everything", tweakIds, isDryRunPreview: dryRun, afterHealthScore, pairId);
-                ShowBenchmarkComparisonDialog(benchmarkBaseline, benchmarkAfter);
-            }
+                var dryRun = DryRun;
+                var tweakIds = toRevert.Select(t => t.Id).ToList();
+                var pairId = Guid.NewGuid().ToString("N");
+                var beforeHealthScore = _lastScan != null ? HealthScore.Compute(_lastScan).Score : (int?)null;
+                var benchmarkBaseline = await CaptureBenchmarkAsync(BenchmarkRunKind.Baseline,
+                    "Before: revert everything", tweakIds, isDryRunPreview: dryRun, beforeHealthScore, pairId);
 
-            UpdateRevertButtonState();
-            RenderHome();
+                var batchResult = await RunBatchAsync($"Reverting {toRevert.Count} tweak(s)...", toRevert,
+                    Performish.Core.Backup.ChangeLogAction.Undo, dryRun);
+
+                _lastBatchResults = batchResult.Results;
+                _lastBatchWasDryRun = dryRun;
+                _lastBenchmark = null;
+                _lastRealBenchmark = null;
+
+                if (benchmarkBaseline != null)
+                {
+                    int? afterHealthScore = null;
+                    if (!dryRun) afterHealthScore = HealthScore.Compute(await Task.Run(() => _services.Scanner.Scan())).Score;
+                    var benchmarkAfter = await CaptureBenchmarkAsync(BenchmarkRunKind.PostApply,
+                        "After: revert everything", tweakIds, isDryRunPreview: dryRun, afterHealthScore, pairId);
+                    ShowBenchmarkComparisonDialog(benchmarkBaseline, benchmarkAfter);
+                }
+
+                _tweaks?.InvalidateStates();
+                UpdateRevertButtonState();
+                RenderHome();
+            }
+            finally
+            {
+                SetBusy(false);
+            }
         }
 
         // ---- Drift detection --------------------------------------------------------------------
@@ -659,7 +799,7 @@ namespace Performish
             lines.Add(($"Mode: {(DryRun ? "DRY RUN (nothing will actually change)" : "REAL - these will be reapplied")}",
                 DryRun ? UiStyle.BrightAccent : UiStyle.Error));
 
-            var confirmed = ConfirmDialogForm.Show(this, "Drifted tweaks detected", lines, "Reapply", "Not now");
+            var confirmed = await ConfirmAsync("Drifted tweaks detected", lines, "Reapply", "Not now", danger: false);
             if (confirmed) await ReviewAndApplyAsync(drifted);
         }
 
