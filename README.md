@@ -65,7 +65,9 @@ workstation or gaming PC for better performance and efficiency.
 
 ## Getting started
 
-1. Download or build the Performish executable.
+1. Download or build the Performish executable. To build from source:
+   `dotnet build Performish.slnx -c Release` (requires the .NET SDK
+   matching the target framework in `Performish/Performish.csproj`).
 2. Run it as Administrator.
 3. Run a scan to see your system's current state.
 4. Open Tweaks (F2), choose a preset or pick individual tweaks, review
