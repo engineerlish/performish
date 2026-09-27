@@ -13,6 +13,14 @@ workstation or gaming PC for better performance and efficiency.
   measured, how many points it earned, and plain-language guidance on
   what to do about it - including when something is outside what
   Performish (or any software) can change directly.
+- **Hardware & firmware view** - a read-only look at your BIOS version
+  and age, motherboard, CPU clocks, memory speed (and whether its
+  XMP/EXPO profile appears to be on), NVIDIA GPU clocks, power and
+  temperature, and firmware settings such as Secure Boot, virtualization
+  and Resizable BAR, with plain-language tips for BIOS settings worth
+  checking. Performish never changes BIOS, clock, voltage or power
+  settings. Anything it can't read on your machine is shown as "not
+  available" with the reason, never a guess.
 - **Startup item review** - see everything set to launch automatically
   when you sign in and choose which ones to stop, without uninstalling
   anything - each one can still be launched manually afterward, and the

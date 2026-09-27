@@ -11,6 +11,7 @@ using Performish.Core.Scanner;
 using Performish.Core.Reporting;
 using Performish.Core.Tweaks;
 using Performish.Dialogs;
+using Performish.Hardware;
 using Performish.Views;
 
 namespace Performish
@@ -132,6 +133,9 @@ namespace Performish
             var healthButton = UiStyle.MakeButton("Health score...");
             healthButton.Click += (s, e) => OpenHealthScore();
 
+            var hardwareButton = UiStyle.MakeButton("Hardware & firmware...");
+            hardwareButton.Click += (s, e) => OpenHardware();
+
             var runBenchmarkButton = UiStyle.MakeButton("Run benchmark now");
             runBenchmarkButton.Click += async (s, e) => await RunStandaloneBenchmarkAsync();
 
@@ -169,7 +173,7 @@ namespace Performish
             _actionControls.AddRange(new Control[]
             {
                 scanButton, browseButton, presetsButton, _revertButton, healthButton, startupButton,
-                driftButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton,
+                driftButton, hardwareButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton,
                 benchmarkButton, historyButton, reportButton, settingsButton
             });
             foreach (var c in _actionControls) c.Enabled = false;
@@ -179,7 +183,7 @@ namespace Performish
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Tweaks",
                 scanButton, browseButton, presetsButton, _revertButton));
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Diagnostics",
-                healthButton, startupButton, driftButton));
+                healthButton, startupButton, driftButton, hardwareButton));
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Benchmarking",
                 runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton, benchmarkButton));
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("History & reports",
@@ -467,6 +471,14 @@ namespace Performish
             }
 
             using var dialog = new HealthScoreForm(HealthScore.Compute(_lastScan));
+            dialog.ShowDialog(this);
+        }
+
+        /// <summary>Read-only BIOS/firmware/hardware view. Unlike Health score it needs no prior Scan: the
+        /// dialog reads the hardware itself when it opens, off the UI thread.</summary>
+        private void OpenHardware()
+        {
+            using var dialog = new HardwareDialogForm(_services.Hardware);
             dialog.ShowDialog(this);
         }
 
