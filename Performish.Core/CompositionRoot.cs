@@ -2,6 +2,7 @@ using System;
 using Performish.Core.Backends;
 using Performish.Core.Backup;
 using Performish.Core.Benchmark;
+using Performish.Core.Hardware;
 using Performish.Core.Models;
 using Performish.Core.Scanner;
 using Performish.Core.Tweaks;
@@ -32,13 +33,16 @@ namespace Performish.Core
         public MigrationResult Migration { get; }
         public BenchmarkSuiteRunner Benchmarks { get; }
         public IBenchmarkRunStore BenchmarkHistory { get; }
+        /// <summary>Read-only BIOS/firmware/hardware visibility (the Hardware & firmware dialog). Never
+        /// writes anything - see RealHardwareInfoBackend and HardwareNoWritePathTests.</summary>
+        public HardwareInfoService Hardware { get; }
 
         private AppServices(
             IProcessRunner process, IRegistryBackend registry, IServiceBackend services, IScheduledTaskBackend tasks,
             IAppxBackend appx, IFileSystemBackend fileSystem, IPowerBackend power, IRestorePointBackend restorePoint,
             IUndoStore undoStore, IChangeLogStore changeLog, ISystemInfoBackend systemInfo, SystemScanner scanner,
             TweakRegistry tweakRegistry, TweakRunner runner, MigrationResult migration,
-            BenchmarkSuiteRunner benchmarks, IBenchmarkRunStore benchmarkHistory)
+            BenchmarkSuiteRunner benchmarks, IBenchmarkRunStore benchmarkHistory, HardwareInfoService hardware)
         {
             Process = process;
             Registry = registry;
@@ -57,6 +61,7 @@ namespace Performish.Core
             Migration = migration;
             Benchmarks = benchmarks;
             BenchmarkHistory = benchmarkHistory;
+            Hardware = hardware;
         }
 
         public static AppServices BuildReal()
@@ -82,9 +87,10 @@ namespace Performish.Core
             var runner = new TweakRunner(changeLog, restorePoint);
             var benchmarks = new BenchmarkSuiteRunner(systemInfo);
             var benchmarkHistory = new FileBenchmarkRunStore(DataPaths.BenchmarksDirectory);
+            var hardware = new HardwareInfoService(new RealHardwareInfoBackend(systemInfo));
 
             return new AppServices(process, registry, services, tasks, appx, fileSystem, power, restorePoint,
-                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, migration, benchmarks, benchmarkHistory);
+                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, migration, benchmarks, benchmarkHistory, hardware);
         }
 
         public TweakExecutionContext CreateContext(bool dryRun, Action<string> onLog = null) =>
@@ -95,7 +101,9 @@ namespace Performish.Core
         /// concrete AppServices, not an interface) can be exercised by Performish.Tests with
         /// simulated input events, per the Phase 4 requirement to test button/state handling without
         /// depending on RealRegistryBackend etc.</summary>
-        public static AppServices BuildFake()
+        /// <param name="hardware">Simulated hardware for the Hardware & firmware dialog; null means a
+        /// machine that reports nothing (every reading shown as unavailable).</param>
+        public static AppServices BuildFake(HardwareRawSnapshot hardware = null)
         {
             var process = new FakeProcessRunner();
             var registry = new FakeRegistryBackend();
@@ -113,9 +121,10 @@ namespace Performish.Core
             var runner = new TweakRunner(changeLog, restorePoint);
             var benchmarks = new BenchmarkSuiteRunner(systemInfo);
             var benchmarkHistory = new InMemoryBenchmarkRunStore();
+            var hardwareInfo = new HardwareInfoService(new FakeHardwareInfoBackend(hardware));
 
             return new AppServices(process, registry, services, tasks, appx, fileSystem, power, restorePoint,
-                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, new MigrationResult(), benchmarks, benchmarkHistory);
+                undoStore, changeLog, systemInfo, scanner, tweakRegistry, runner, new MigrationResult(), benchmarks, benchmarkHistory, hardwareInfo);
         }
     }
 }
