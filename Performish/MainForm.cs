@@ -323,6 +323,12 @@ namespace Performish
 
             RenderHome();
             UpdateRevertButtonState();
+
+            // Runs after the window is already visible and painted (Shown already fired) - never
+            // blocks first paint. Reuses RunScanAsync() exactly as the manual Scan button does, so a
+            // failed or partial scan is shown the same way (SetBusy + "Scanning..." + try/catch that
+            // appends "Scan failed: ..." rather than throwing) - see the manual Scan button above.
+            if (_settings.ScanOnStartup) await RunScanAsync();
         }
 
         private void UpdateRevertButtonState()
@@ -416,18 +422,23 @@ namespace Performish
             AppendLine("", UiStyle.Foreground);
             AppendLine("  Scanning (read-only)...", UiStyle.Dim);
 
+            var failed = false;
             try
             {
                 _lastScan = await Task.Run(() => _services.Scanner.Scan());
             }
             catch (Exception ex)
             {
+                failed = true;
                 AppendLine($"  Scan failed: {ex.Message}", UiStyle.Error);
             }
             finally
             {
                 SetBusy(false);
-                RenderHome();
+                // RenderHome() clears the console and reprints from scratch - on failure that would
+                // silently erase the "Scan failed: ..." line just appended above (_lastScan is still
+                // null, so it would just reprint "No scan yet"). Skip it so the failure stays visible.
+                if (!failed) RenderHome();
             }
         }
 

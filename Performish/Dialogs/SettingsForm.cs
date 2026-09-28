@@ -14,12 +14,13 @@ namespace Performish.Dialogs
         /// dialog's test-only accessors.</summary>
         public CheckBox RestorePointCheckBox { get; }
         public CheckBox BenchmarkNetworkCheckBox { get; }
+        public CheckBox ScanOnStartupCheckBox { get; }
 
         public SettingsForm(AppSettings settings)
         {
             Text = "Settings";
             Width = 560;
-            Height = 260;
+            Height = 320;
             BackColor = UiStyle.Background;
             Font = UiStyle.Mono;
             StartPosition = FormStartPosition.CenterParent;
@@ -37,6 +38,19 @@ namespace Performish.Dialogs
                 BackColor = UiStyle.Background,
                 Padding = new Padding(16)
             };
+
+            var startupLabel = UiStyle.MakeLabel("Startup", UiStyle.Dim, bold: true);
+            body.Controls.Add(startupLabel);
+
+            ScanOnStartupCheckBox = UiStyle.MakeCheckBox("Scan automatically on startup");
+            ScanOnStartupCheckBox.Checked = settings.ScanOnStartup;
+            ScanOnStartupCheckBox.CheckedChanged += (s, e) =>
+            {
+                settings.ScanOnStartup = ScanOnStartupCheckBox.Checked;
+                settings.Save();
+            };
+            ScanOnStartupCheckBox.Margin = new Padding(4, 4, 4, 16);
+            body.Controls.Add(ScanOnStartupCheckBox);
 
             var restoreLabel = UiStyle.MakeLabel("Applying tweaks", UiStyle.Dim, bold: true);
             body.Controls.Add(restoreLabel);

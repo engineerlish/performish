@@ -14,6 +14,11 @@ namespace Performish
         public bool DryRunByDefault { get; set; } = true;
         public bool CreateRestorePointByDefault { get; set; } = true;
 
+        /// <summary>Off by default, matching the pre-existing behavior (Home shows "No scan yet" until
+        /// the user clicks Scan). When on, MainForm runs the same read-only Scan automatically once
+        /// services finish loading after first paint - never before the window is shown.</summary>
+        public bool ScanOnStartup { get; set; } = false;
+
         /// <summary>Which benchmark suite (if any) runs automatically around an apply/revert batch -
         /// Quick by default so benchmarking never makes routine tweak application feel slow (the
         /// task's own "no regressions to apply speed" rule); the user can turn it Off or up to Full.

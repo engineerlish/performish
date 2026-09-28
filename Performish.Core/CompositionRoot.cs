@@ -101,9 +101,12 @@ namespace Performish.Core
         /// concrete AppServices, not an interface) can be exercised by Performish.Tests with
         /// simulated input events, per the Phase 4 requirement to test button/state handling without
         /// depending on RealRegistryBackend etc.</summary>
-        /// <param name="hardware">Simulated hardware for the Hardware & firmware dialog; null means a
-        /// machine that reports nothing (every reading shown as unavailable).</param>
-        public static AppServices BuildFake(HardwareRawSnapshot hardware = null)
+        /// <param name="hardware">Simulated hardware for the Hardware screen; null means a machine that
+        /// reports nothing (every reading shown as unavailable).</param>
+        /// <param name="systemInfo">Simulated backend for SystemScanner; null means a well-behaved
+        /// FakeSystemInfoBackend. Tests pass a throwing implementation to exercise a failed scan
+        /// (including the scan-on-startup path) without touching a real machine.</param>
+        public static AppServices BuildFake(HardwareRawSnapshot hardware = null, ISystemInfoBackend systemInfo = null)
         {
             var process = new FakeProcessRunner();
             var registry = new FakeRegistryBackend();
@@ -115,7 +118,7 @@ namespace Performish.Core
             var restorePoint = new FakeRestorePointBackend();
             var undoStore = new InMemoryUndoStore();
             var changeLog = new InMemoryChangeLogStore();
-            var systemInfo = new FakeSystemInfoBackend();
+            systemInfo ??= new FakeSystemInfoBackend();
             var scanner = new SystemScanner(systemInfo, power);
             var tweakRegistry = TweakRegistry.BuildDefault();
             var runner = new TweakRunner(changeLog, restorePoint);
