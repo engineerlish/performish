@@ -11,7 +11,6 @@ using Performish.Core.Scanner;
 using Performish.Core.Reporting;
 using Performish.Core.Tweaks;
 using Performish.Dialogs;
-using Performish.Hardware;
 using Performish.Views;
 
 namespace Performish
@@ -32,11 +31,12 @@ namespace Performish
         private AppSettings _settings;
         private AppServices _services;
 
-        private enum ViewKind { Home, Tweaks, Results }
+        private enum ViewKind { Home, Tweaks, Results, Hardware }
 
         private HomeView _home;
         private TweaksView _tweaks;
         private ResultsView _results;
+        private HardwareView _hardware;
         private ConfirmOverlay _overlay;
         private Panel _content, _nav;
         private readonly Dictionary<ViewKind, Button> _navButtons = new Dictionary<ViewKind, Button>();
@@ -133,9 +133,6 @@ namespace Performish
             var healthButton = UiStyle.MakeButton("Health score...");
             healthButton.Click += (s, e) => OpenHealthScore();
 
-            var hardwareButton = UiStyle.MakeButton("Hardware & firmware...");
-            hardwareButton.Click += (s, e) => OpenHardware();
-
             var runBenchmarkButton = UiStyle.MakeButton("Run benchmark now");
             runBenchmarkButton.Click += async (s, e) => await RunStandaloneBenchmarkAsync();
 
@@ -173,7 +170,7 @@ namespace Performish
             _actionControls.AddRange(new Control[]
             {
                 scanButton, browseButton, presetsButton, _revertButton, healthButton, startupButton,
-                driftButton, hardwareButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton,
+                driftButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton,
                 benchmarkButton, historyButton, reportButton, settingsButton
             });
             foreach (var c in _actionControls) c.Enabled = false;
@@ -183,7 +180,7 @@ namespace Performish
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Tweaks",
                 scanButton, browseButton, presetsButton, _revertButton));
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Diagnostics",
-                healthButton, startupButton, driftButton, hardwareButton));
+                healthButton, startupButton, driftButton));
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Benchmarking",
                 runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton, benchmarkButton));
             _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("History & reports",
@@ -218,7 +215,7 @@ namespace Performish
             _nav.Controls.Add(cursor);
 
             int y = 76;
-            foreach (var (kind, label, key) in new[] { (ViewKind.Home, "Home", "F1"), (ViewKind.Tweaks, "Tweaks", "F2"), (ViewKind.Results, "Results", "F3") })
+            foreach (var (kind, label, key) in new[] { (ViewKind.Home, "Home", "F1"), (ViewKind.Tweaks, "Tweaks", "F2"), (ViewKind.Results, "Results", "F3"), (ViewKind.Hardware, "Hardware", "F4") })
             {
                 var k = kind;
                 var button = new Button
@@ -265,10 +262,18 @@ namespace Performish
         private void ShowView(ViewKind view)
         {
             if (view == ViewKind.Tweaks && _tweaks == null) view = ViewKind.Home; // not loaded yet
+            if (view == ViewKind.Hardware && _hardware == null) view = ViewKind.Home; // not loaded yet
             _currentView = view;
             _home.Visible = view == ViewKind.Home;
             if (_tweaks != null) _tweaks.Visible = view == ViewKind.Tweaks;
             _results.Visible = view == ViewKind.Results;
+            if (_hardware != null)
+            {
+                _hardware.Visible = view == ViewKind.Hardware;
+                // Lazily loaded: the WMI/NVML read only happens once someone actually opens this
+                // screen, not eagerly at startup, so visiting Hardware never adds to launch time.
+                if (view == ViewKind.Hardware && !_hardware.IsLoaded) _ = _hardware.LoadAsync();
+            }
             foreach (var (kind, button) in _navButtons)
             {
                 bool active = kind == view;
@@ -289,6 +294,7 @@ namespace Performish
                     case Keys.F1: ShowView(ViewKind.Home); return true;
                     case Keys.F2: ShowView(ViewKind.Tweaks); return true;
                     case Keys.F3: ShowView(ViewKind.Results); return true;
+                    case Keys.F4: ShowView(ViewKind.Hardware); return true;
                 }
             }
             return base.ProcessCmdKey(ref msg, keyData);
@@ -319,6 +325,10 @@ namespace Performish
             };
             _tweaks.ReviewRequested += selection => _ = ReviewAndApplyAsync(selection);
             _content.Controls.Add(_tweaks);
+
+            _hardware = new HardwareView(_services.Hardware) { Dock = DockStyle.Fill, Visible = false };
+            _content.Controls.Add(_hardware);
+
             ShowView(_currentView);
 
             RenderHome();
@@ -482,14 +492,6 @@ namespace Performish
             }
 
             using var dialog = new HealthScoreForm(HealthScore.Compute(_lastScan));
-            dialog.ShowDialog(this);
-        }
-
-        /// <summary>Read-only BIOS/firmware/hardware view. Unlike Health score it needs no prior Scan: the
-        /// dialog reads the hardware itself when it opens, off the UI thread.</summary>
-        private void OpenHardware()
-        {
-            using var dialog = new HardwareDialogForm(_services.Hardware);
             dialog.ShowDialog(this);
         }
 
