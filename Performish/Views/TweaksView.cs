@@ -11,9 +11,11 @@ namespace Performish.Views
 {
     /// <summary>The in-window replacement for the old Tweak Browser dialog and Presets picker: category
     /// and preset chips plus search up top, a paged grid of tweak cards (no scrolling), a detail panel
-    /// under the grid that follows the current card, and an action bar. Nothing here opens a window;
-    /// "Review & apply" just raises <see cref="ReviewRequested"/> and the shell shows its in-window
-    /// confirmation.</summary>
+    /// under the grid that follows the current card, a diagnostics row (Health score, Startup items,
+    /// Check for drift, Revert everything - moved here from the old Home screen, since they're all
+    /// either alternate ways to pick tweaks or the undo counterpart to applying them), and an action bar.
+    /// Nothing here opens a window; "Review & apply" just raises <see cref="ReviewRequested"/> and the
+    /// shell shows its in-window confirmation.</summary>
     public sealed class TweaksView : UserControl
     {
         private const int CardMinWidth = 236, CardHeight = 112, Gap = 14, DetailHeight = 214;
@@ -39,14 +41,20 @@ namespace Performish.Views
         private Label _pageLabel, _countLabel;
         private TextBox _searchBox;
         private Button _reviewButton, _clearButton, _selectAllButton;
+        private Button _healthButton, _startupButton, _driftButton, _revertButton;
         private FlowLayoutPanel _presetFlow, _detailLeft, _detailRight;
         private Label _dTitle, _dMeta, _dDescription, _dNotes, _dSource, _dState;
         private RiskBadge _dBadge;
         private Button _toggleButton;
 
         public event Action<List<TweakDefinition>> ReviewRequested;
+        public event Action HealthScoreRequested;
+        public event Action StartupItemsRequested;
+        public event Action DriftCheckRequested;
+        public event Action RevertRequested;
 
         private bool _busy;
+        private bool _revertEnabled;
 
         /// <summary>While the shell is scanning/applying, the actions that could start another batch are
         /// disabled (a few buttons, not the whole control tree).</summary>
@@ -55,6 +63,11 @@ namespace Performish.Views
         // ---- test/automation surface --------------------------------------------------------------
 
         public Button ReviewButton => _reviewButton;
+        public Button HealthScoreButton => _healthButton;
+        public Button StartupItemsButton => _startupButton;
+        public Button DriftButton => _driftButton;
+        public Button RevertButton => _revertButton;
+        public void SetRevertEnabled(bool enabled) { _revertEnabled = enabled; RefreshAll(); }
         public Button ToggleButton => _toggleButton;
         public IReadOnlyList<TweakDefinition> VisibleTweaks => _visible;
         public IReadOnlyCollection<string> SelectedIds => _selectedIds;
@@ -141,6 +154,28 @@ namespace Performish.Views
             rowB.Controls.Add(presetLabel);
             rowB.Controls.Add(searchHost);
 
+            // --- diagnostics row: system checks that feed tweak selection, plus the risky "undo
+            // everything" action - kept separate from the apply action bar at the bottom so Review &
+            // apply stays the one obvious primary action there ---
+            var rowC = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiStyle.Background, Padding = new Padding(0, 2, 0, 0) };
+            var diagFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, BackColor = UiStyle.Background, WrapContents = false };
+            _healthButton = UiStyle.MakeButton("Health score...", UiStyle.Foreground);
+            _healthButton.Click += (s, e) => HealthScoreRequested?.Invoke();
+            _startupButton = UiStyle.MakeButton("Startup items...", UiStyle.Foreground);
+            _startupButton.Click += (s, e) => StartupItemsRequested?.Invoke();
+            _driftButton = UiStyle.MakeButton("Check for drift...", UiStyle.Foreground);
+            _driftButton.Click += (s, e) => DriftCheckRequested?.Invoke();
+            diagFlow.Controls.Add(_healthButton);
+            diagFlow.Controls.Add(_startupButton);
+            diagFlow.Controls.Add(_driftButton);
+            var revertHost = new Panel { Dock = DockStyle.Right, AutoSize = true, BackColor = UiStyle.Background };
+            _revertButton = UiStyle.MakeButton("Revert everything...", UiStyle.Error);
+            _revertButton.Enabled = false; // re-enabled once SetRevertEnabled() confirms a backup exists
+            _revertButton.Click += (s, e) => { if (_revertButton.Enabled) RevertRequested?.Invoke(); };
+            revertHost.Controls.Add(_revertButton);
+            rowC.Controls.Add(diagFlow);
+            rowC.Controls.Add(revertHost);
+
             // --- grid + pager ---
             _grid = new Panel { Dock = DockStyle.Fill, BackColor = UiStyle.Background };
             _grid.Resize += (s, e) => LayoutCards();
@@ -208,10 +243,13 @@ namespace Performish.Views
             bar.Controls.Add(_countLabel);
             bar.Controls.Add(barButtons);
 
-            // Fill first, then bottoms (last added docks outermost), then tops.
+            // Fill first, then bottoms (last added docks outermost), then tops (last added docks
+            // topmost, so rowC/rowB/rowA here - in that add order - end up rowA-then-rowB-then-rowC
+            // top to bottom, just above the grid).
             Controls.Add(gridHost);
             Controls.Add(detail);
             Controls.Add(bar);
+            Controls.Add(rowC);
             Controls.Add(rowB);
             Controls.Add(rowA);
         }
@@ -306,8 +344,6 @@ namespace Performish.Views
             RefreshAll();
         }
 
-        public void ShowCategory(TweakCategory? category) { _cursor = 0; ApplyFilter(category); }
-        public void FocusPresets() { if (_presetFlow.Controls.Count > 0) _presetFlow.Controls[1 % _presetFlow.Controls.Count].Focus(); }
 
         private void ToggleSelected(string id)
         {
@@ -421,6 +457,10 @@ namespace Performish.Views
             _countLabel.Text = $"{n} selected   ({safe} safe, {mod} moderate, {adv} advanced)   -   {_visible.Count} tweak(s) in this view";
             _reviewButton.Enabled = n > 0 && !_busy;
             _clearButton.Enabled = n > 0 && !_busy;
+            _healthButton.Enabled = !_busy;
+            _startupButton.Enabled = !_busy;
+            _driftButton.Enabled = !_busy;
+            _revertButton.Enabled = _revertEnabled && !_busy;
             RenderDetail();
         }
 

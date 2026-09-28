@@ -64,7 +64,8 @@ workstation or gaming PC for better performance and efficiency.
 - **Command-line mode** - run presets unattended from a script or
   management tool, with the same preview/report/benchmark options.
 - **Settings** - control whether a System Restore point is created
-  before applying and whether benchmarking includes network metrics.
+  before applying, whether benchmarking includes network metrics, and
+  whether Performish scans automatically each time it starts.
 
 ## Requirements
 

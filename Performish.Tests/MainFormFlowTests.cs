@@ -48,12 +48,12 @@ namespace Performish.Tests
             var settings = new AppSettings { DryRunByDefault = dryRunByDefault, BenchmarkModeDefault = BenchmarkMode.Off };
             var form = new MainForm(services, settings) { StartPosition = FormStartPosition.Manual, Location = new System.Drawing.Point(10, 10) };
             form.Show();
-            Pump(() => Find<Button>(form, b => b.Text == "Browse tweaks...")?.Enabled == true);
+            Pump(() => Find<Button>(form, b => b.Text == "Scan")?.Enabled == true);
             return form;
         }
 
         [StaFact]
-        public void BrowseTweaks_SwitchesTheContentToTheTweaksView_InsideTheSameWindow()
+        public void ClickingTweaksNav_SwitchesTheContentToTheTweaksView_InsideTheSameWindow()
         {
             var services = AppServices.BuildFake();
             using var form = Start(services, dryRunByDefault: true);
@@ -62,7 +62,7 @@ namespace Performish.Tests
             Assert.True(home.Visible);
             Assert.False(tweaks.Visible);
 
-            Find<Button>(form, b => b.Text == "Browse tweaks...").PerformClick();
+            Find<Button>(form, b => b.Text == "Tweaks").PerformClick();
 
             Assert.True(tweaks.Visible);
             Assert.False(home.Visible);
@@ -74,7 +74,7 @@ namespace Performish.Tests
         {
             var services = AppServices.BuildFake();
             using var form = Start(services, dryRunByDefault: false);
-            Find<Button>(form, b => b.Text == "Browse tweaks...").PerformClick();
+            Find<Button>(form, b => b.Text == "Tweaks").PerformClick();
             var tweaks = Find<TweaksView>(form);
             var overlay = Find<ConfirmOverlay>(form);
             var results = Find<ResultsView>(form);
@@ -107,7 +107,7 @@ namespace Performish.Tests
         {
             var services = AppServices.BuildFake();
             using var form = Start(services, dryRunByDefault: false);
-            Find<Button>(form, b => b.Text == "Browse tweaks...").PerformClick();
+            Find<Button>(form, b => b.Text == "Tweaks").PerformClick();
             var tweaks = Find<TweaksView>(form);
             var overlay = Find<ConfirmOverlay>(form);
             var results = Find<ResultsView>(form);
@@ -128,7 +128,7 @@ namespace Performish.Tests
         {
             var services = AppServices.BuildFake();
             using var form = Start(services, dryRunByDefault: true);
-            Find<Button>(form, b => b.Text == "Browse tweaks...").PerformClick();
+            Find<Button>(form, b => b.Text == "Tweaks").PerformClick();
             var tweaks = Find<TweaksView>(form);
             var overlay = Find<ConfirmOverlay>(form);
             var results = Find<ResultsView>(form);

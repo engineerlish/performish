@@ -59,7 +59,7 @@ namespace Performish.Tests
                 Location = new System.Drawing.Point(10, 10)
             };
             form.Show();
-            Pump(() => Find<Button>(form, b => b.Text == "Browse tweaks...")?.Enabled == true);
+            Pump(() => Find<Button>(form, b => b.Text == "Scan")?.Enabled == true);
             return form;
         }
 
@@ -101,14 +101,11 @@ namespace Performish.Tests
         }
 
         [StaFact]
-        public void HomeScreen_NoLongerHasAHardwareButton_EveryOtherActionStillThere()
+        public void HomeScreen_NoLongerHasAHardwareButton_SidebarUnchangedOtherwise()
         {
             using var form = Start();
 
             Assert.Null(Find<Button>(form, b => b.Text == "Hardware & firmware..."));
-            foreach (var text in new[] { "Scan", "Browse tweaks...", "Presets...", "Revert everything...", "Health score...", "Startup items...",
-                "Check for drift...", "Run benchmark now", "Benchmark history...", "Import frame-time CSV...", "History...", "Export report...", "Settings..." })
-                Assert.NotNull(Find<Button>(form, b => b.Text == text));
             foreach (var nav in new[] { "Home", "Tweaks", "Results", "Hardware" })
                 Assert.NotNull(Find<Button>(form, b => b.Text == nav));
         }
@@ -117,7 +114,7 @@ namespace Performish.Tests
         public void ExistingFlows_StillWork()
         {
             using var form = Start();
-            Find<Button>(form, b => b.Text == "Browse tweaks...").PerformClick();
+            Find<Button>(form, b => b.Text == "Tweaks").PerformClick();
             Assert.True(Find<TweaksView>(form).Visible);
             Find<Button>(form, b => b.Text == "Home").PerformClick();
             Assert.True(Find<HomeView>(form).Visible);

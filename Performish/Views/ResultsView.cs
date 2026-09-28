@@ -13,10 +13,13 @@ using static Performish.ResultPresenter;
 
 namespace Performish.Views
 {
-    /// <summary>The in-window replacement for the apply/undo progress + results popup. While a batch
-    /// runs it shows a live log and a Cancel button; when it finishes it shows three counters (which
-    /// double as filters), a failures-first list with a plain-text marker on every row, a detail panel,
-    /// and Retry for a failed tweak. Nothing here opens a window.</summary>
+    /// <summary>The in-window replacement for the apply/undo progress + results popup. A persistent
+    /// toolbar (Run benchmark now, Benchmark history, the Benchmark mode toggle, Import frame-time CSV,
+    /// History - moved here from the old Home screen, since Results is where outcomes and records are
+    /// naturally checked) sits above the batch-specific content. While a batch runs that content is a
+    /// live log and a Cancel button; when it finishes it's three counters (which double as filters), a
+    /// failures-first list with a plain-text marker on every row, a detail panel, and Retry for a failed
+    /// tweak. Nothing here opens a window.</summary>
     public sealed class ResultsView : UserControl
     {
         private enum Mode { Empty, Running, Done }
@@ -27,6 +30,10 @@ namespace Performish.Views
         private readonly RichTextBox _log, _detail;
         private readonly ListView _list;
         private readonly Button _backButton, _exportButton, _retryButton, _cancelButton;
+        // Standalone actions that don't belong to any one batch - benchmarking and history/reports -
+        // live in this persistent toolbar rather than duplicated on Home, since Results is where
+        // outcomes and records are naturally checked.
+        private readonly Button _runBenchmarkButton, _benchmarkHistoryButton, _benchmarkModeButton, _importCsvButton, _historyButton;
         private CancellationTokenSource _cts;
 
         private Mode _mode = Mode.Empty;
@@ -40,6 +47,11 @@ namespace Performish.Views
 
         public event Action BackRequested;
         public event Action ExportRequested;
+        public event Action RunBenchmarkRequested;
+        public event Action BenchmarkHistoryRequested;
+        public event Action BenchmarkModeToggleRequested;
+        public event Action ImportFrameTimeRequested;
+        public event Action HistoryRequested;
 
         public BatchRunResult Result { get; private set; }
         public bool IsRunning => _mode == Mode.Running;
@@ -63,6 +75,21 @@ namespace Performish.Views
         public void RetryButtonClickForTesting() => RetrySelected();
         public void CancelForTesting() => RequestCancel();
 
+        public Button RunBenchmarkButton => _runBenchmarkButton;
+        public Button BenchmarkHistoryButton => _benchmarkHistoryButton;
+        public Button BenchmarkModeButton => _benchmarkModeButton;
+        public Button ImportCsvButton => _importCsvButton;
+        public Button HistoryButton => _historyButton;
+        public void SetBenchmarkModeText(string text) => _benchmarkModeButton.Text = text;
+        /// <summary>Gates the standalone toolbar until AppServices/AppSettings finish loading after first
+        /// paint - the same "nothing is clickable until initialization finishes" gate MainForm's other
+        /// action controls use.</summary>
+        public void SetToolbarEnabled(bool enabled)
+        {
+            foreach (var b in new[] { _runBenchmarkButton, _benchmarkHistoryButton, _benchmarkModeButton, _importCsvButton, _historyButton })
+                b.Enabled = enabled;
+        }
+
         public ResultsView()
         {
             BackColor = UiStyle.Background;
@@ -70,6 +97,28 @@ namespace Performish.Views
             Font = UiStyle.Mono;
             AccessibleName = "Results";
             AccessibleRole = AccessibleRole.Pane;
+
+            var toolbar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiStyle.Background, Padding = new Padding(0, 0, 0, 2) };
+            var toolbarFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, BackColor = UiStyle.Background, WrapContents = false };
+            _runBenchmarkButton = UiStyle.MakeButton("Run benchmark now", UiStyle.Foreground);
+            _runBenchmarkButton.Click += (s, e) => RunBenchmarkRequested?.Invoke();
+            _benchmarkHistoryButton = UiStyle.MakeButton("Benchmark history...", UiStyle.Foreground);
+            _benchmarkHistoryButton.Click += (s, e) => BenchmarkHistoryRequested?.Invoke();
+            // Cycles Off -> Quick -> Full -> Off - a toggle rather than a dropdown/picker, so "show an
+            // estimated time... let the user skip or choose a quick subset" doesn't need its own screen.
+            _benchmarkModeButton = UiStyle.MakeButton("Benchmark: Quick", UiStyle.Foreground);
+            _benchmarkModeButton.Click += (s, e) => BenchmarkModeToggleRequested?.Invoke();
+            _importCsvButton = UiStyle.MakeButton("Import frame-time CSV...", UiStyle.Foreground);
+            _importCsvButton.Click += (s, e) => ImportFrameTimeRequested?.Invoke();
+            _historyButton = UiStyle.MakeButton("History...", UiStyle.Foreground);
+            _historyButton.Click += (s, e) => HistoryRequested?.Invoke();
+            toolbarFlow.Controls.Add(_runBenchmarkButton);
+            toolbarFlow.Controls.Add(_benchmarkHistoryButton);
+            toolbarFlow.Controls.Add(_benchmarkModeButton);
+            toolbarFlow.Controls.Add(_importCsvButton);
+            toolbarFlow.Controls.Add(_historyButton);
+            toolbar.Controls.Add(toolbarFlow);
+            SetToolbarEnabled(false); // re-enabled once MainForm's services/settings finish loading
 
             _header = new Label { Font = UiStyle.Big, ForeColor = UiStyle.Foreground, AutoSize = false, Dock = DockStyle.Top, Height = 40, TextAlign = ContentAlignment.MiddleLeft };
             _summary = new Label { Font = UiStyle.MonoBold, ForeColor = UiStyle.Foreground, AutoSize = false, Dock = DockStyle.Top, Height = 28, TextAlign = ContentAlignment.MiddleLeft };
@@ -165,6 +214,7 @@ namespace Performish.Views
             Controls.Add(_tiles);
             Controls.Add(_summary);
             Controls.Add(_header);
+            Controls.Add(toolbar);
             _detailHost = detailHost;
 
             _header.Text = "Results";

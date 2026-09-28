@@ -15,11 +15,13 @@ using Performish.Views;
 
 namespace Performish
 {
-    /// <summary>The main window: a left navigation rail (Home / Tweaks / Results) and one content area
-    /// that swaps between in-window views under Views/. Browsing and choosing tweaks, the apply
-    /// confirmation, and the apply/undo results all happen in this window (no popups); the smaller
-    /// utility dialogs (health score, startup items, history, benchmarks, settings) remain modal
-    /// dialogs under Dialogs/.</summary>
+    /// <summary>The main window: a left navigation rail (Home / Tweaks / Results / Hardware, F1-F4) and
+    /// one content area that swaps between in-window views under Views/. Browsing and choosing tweaks,
+    /// the apply confirmation, and the apply/undo results all happen in this window (no popups). Home is
+    /// deliberately minimal - the banner/status console and Scan - with everything else grouped by
+    /// subject on whichever sidebar screen it's actually about; Settings is a persistent nav-rail
+    /// control rather than a per-screen button. Health score, Startup items, History, Benchmark history
+    /// and Settings remain small modal dialogs under Dialogs/.</summary>
     public sealed class MainForm : Form
     {
         // Neither is constructed here anymore (see OnFirstShownAsync): AppSettings.Load() and
@@ -44,8 +46,6 @@ namespace Performish
         private RichTextBox _console;
         private FlowLayoutPanel _buttonPanel;
         private CheckBox _dryRunCheckBox;
-        private Button _revertButton;
-        private Button _benchmarkModeButton;
 
         // The buttons actually need enabling/disabling as a group (loading-gate, busy-gate) - tracked
         // separately from _buttonPanel's own Controls now that buttons live nested inside per-section
@@ -95,6 +95,12 @@ namespace Performish
             _home = new HomeView { Dock = DockStyle.Fill };
             _console = _home.Console;
 
+            // Home is reduced to the essentials: the banner/status console (above) and Scan (below).
+            // Everything else that used to live here as a button moved to whichever sidebar screen it's
+            // actually about - Tweaks (Health score, Startup items, Check for drift, Revert everything),
+            // Results (benchmarking, History, Export report) - or, for Settings, the nav rail itself,
+            // since it's a persistent utility rather than a per-screen action. See DECISIONS.md "Home
+            // screen simplification" for the full reasoning.
             _buttonPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
@@ -108,49 +114,6 @@ namespace Performish
             var scanButton = UiStyle.MakeButton("Scan");
             scanButton.Click += async (s, e) => await RunScanAsync();
 
-            var browseButton = UiStyle.MakeButton("Browse tweaks...");
-            browseButton.Click += (s, e) => OpenBrowser(null);
-
-            var presetsButton = UiStyle.MakeButton("Presets...");
-            presetsButton.Click += (s, e) => OpenPresetPicker();
-
-            var historyButton = UiStyle.MakeButton("History...");
-            historyButton.Click += (s, e) => OpenHistory();
-
-            _revertButton = UiStyle.MakeButton("Revert everything...", UiStyle.Error);
-            _revertButton.Enabled = false; // re-enabled once UpdateRevertButtonState() confirms a backup exists
-            _revertButton.Click += async (s, e) => await RevertEverythingAsync();
-
-            var benchmarkButton = UiStyle.MakeButton("Import frame-time CSV...");
-            benchmarkButton.Click += (s, e) => ImportFrameTimeCsv();
-
-            var driftButton = UiStyle.MakeButton("Check for drift...");
-            driftButton.Click += async (s, e) => await CheckForDriftAsync();
-
-            var startupButton = UiStyle.MakeButton("Startup items...");
-            startupButton.Click += (s, e) => OpenStartupItems();
-
-            var healthButton = UiStyle.MakeButton("Health score...");
-            healthButton.Click += (s, e) => OpenHealthScore();
-
-            var runBenchmarkButton = UiStyle.MakeButton("Run benchmark now");
-            runBenchmarkButton.Click += async (s, e) => await RunStandaloneBenchmarkAsync();
-
-            var benchmarkHistoryButton = UiStyle.MakeButton("Benchmark history...");
-            benchmarkHistoryButton.Click += (s, e) => OpenBenchmarkHistory();
-
-            // Cycles Off -> Quick -> Full -> Off - a toggle rather than a dropdown/picker dialog, so
-            // "show an estimated time... let the user skip or choose a quick subset" doesn't need its
-            // own screen. Label always shows the current mode plus its time estimate.
-            _benchmarkModeButton = UiStyle.MakeButton("Benchmark: Quick");
-            _benchmarkModeButton.Click += (s, e) => CycleBenchmarkMode();
-
-            var reportButton = UiStyle.MakeButton("Export report...");
-            reportButton.Click += (s, e) => ExportReport();
-
-            var settingsButton = UiStyle.MakeButton("Settings...");
-            settingsButton.Click += (s, e) => OpenSettings();
-
             // Default true (matches AppSettings' own default) until the real, persisted value loads
             // asynchronously - see OnFirstShownAsync(). Never mutates _settings before it exists.
             _dryRunCheckBox = UiStyle.MakeCheckBox("Dry run (nothing actually changes)");
@@ -163,34 +126,25 @@ namespace Performish
                 RenderHome();
             };
 
-            // Disabled until AppServices finishes loading in the background - every one of these
-            // needs _services (a scan, the tweak registry, the change log, ...). Settings only needs
-            // _settings (loads at the same time) so it's gated the same way for a consistent "nothing
-            // is clickable until initialization finishes" feel.
-            _actionControls.AddRange(new Control[]
-            {
-                scanButton, browseButton, presetsButton, _revertButton, healthButton, startupButton,
-                driftButton, runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton,
-                benchmarkButton, historyButton, reportButton, settingsButton
-            });
+            var settingsButton = UiStyle.MakeButton("Settings...", UiStyle.Foreground);
+            settingsButton.Click += (s, e) => OpenSettings();
+
+            // Disabled until AppServices/AppSettings finish loading in the background - a consistent
+            // "nothing is clickable until initialization finishes" feel.
+            _actionControls.AddRange(new Control[] { scanButton, settingsButton });
             foreach (var c in _actionControls) c.Enabled = false;
 
-            // Grouped into labeled sections instead of one flat wrapped row of 14 controls - see
-            // UiStyle.MakeButtonSection and NEXT_DIRECTIONS.md "Direction C: day-to-day usability".
-            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Tweaks",
-                scanButton, browseButton, presetsButton, _revertButton));
-            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Diagnostics",
-                healthButton, startupButton, driftButton));
-            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Benchmarking",
-                runBenchmarkButton, benchmarkHistoryButton, _benchmarkModeButton, benchmarkButton));
-            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("History & reports",
-                historyButton, reportButton));
-            _buttonPanel.Controls.Add(UiStyle.MakeButtonSection("Options", settingsButton));
+            _buttonPanel.Controls.Add(scanButton);
             _home.AddBottom(_buttonPanel);
 
             _results = new ResultsView { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(24, 16, 24, 0) };
             _results.BackRequested += () => ShowView(_tweaks != null ? ViewKind.Tweaks : ViewKind.Home);
             _results.ExportRequested += ExportReport;
+            _results.RunBenchmarkRequested += () => _ = RunStandaloneBenchmarkAsync();
+            _results.BenchmarkHistoryRequested += OpenBenchmarkHistory;
+            _results.BenchmarkModeToggleRequested += CycleBenchmarkMode;
+            _results.ImportFrameTimeRequested += ImportFrameTimeCsv;
+            _results.HistoryRequested += OpenHistory;
             _overlay = new ConfirmOverlay();
 
             _content = new Panel { Dock = DockStyle.Fill, BackColor = UiStyle.Background };
@@ -198,13 +152,13 @@ namespace Performish
             _content.Controls.Add(_results);
             _content.Controls.Add(_overlay);
 
-            BuildNavRail();
+            BuildNavRail(settingsButton);
             Controls.Add(_content);
             Controls.Add(_nav);
             ShowView(ViewKind.Home);
         }
 
-        private void BuildNavRail()
+        private void BuildNavRail(Button settingsButton)
         {
             _nav = new Panel { Dock = DockStyle.Left, Width = 184, BackColor = UiStyle.Panel };
             _nav.Paint += (s, e) => { using var p = new Pen(UiStyle.Line); e.Graphics.DrawLine(p, _nav.Width - 1, 0, _nav.Width - 1, _nav.Height); };
@@ -247,13 +201,20 @@ namespace Performish
                 y += 46;
             }
 
-            var dryBox = new Panel { Dock = DockStyle.Bottom, Height = 128, BackColor = UiStyle.Panel, Padding = new Padding(14, 10, 10, 10) };
-            var note = new Label { Text = "With dry run on, nothing on this machine changes.", ForeColor = UiStyle.Faint, Font = UiStyle.MonoSmall, BackColor = UiStyle.Panel, Dock = DockStyle.Fill };
+            var dryBox = new Panel { Dock = DockStyle.Bottom, Height = 168, BackColor = UiStyle.Panel, Padding = new Padding(14, 10, 10, 10) };
+            var note = new Label { Text = "With dry run on, nothing on this machine changes.", ForeColor = UiStyle.Faint, Font = UiStyle.MonoSmall, BackColor = UiStyle.Panel, Dock = DockStyle.Top, Height = 36 };
             _dryRunCheckBox.BackColor = UiStyle.Panel;
             _dryRunCheckBox.AutoSize = false;
             _dryRunCheckBox.Dock = DockStyle.Top;
             _dryRunCheckBox.Height = 44;
             _dryRunCheckBox.Text = "Dry run";
+            // Settings is a persistent utility, not a per-screen action, so it lives here in the nav
+            // rail rather than duplicated on Home or any one sidebar screen.
+            settingsButton.Dock = DockStyle.Top;
+            settingsButton.Margin = new Padding(0, 10, 0, 0);
+            // Dock=Top: last-added ends up topmost, so add in reverse of the intended top-to-bottom
+            // order (dry run checkbox, then the note, then Settings at the very bottom).
+            dryBox.Controls.Add(settingsButton);
             dryBox.Controls.Add(note);
             dryBox.Controls.Add(_dryRunCheckBox);
             _nav.Controls.Add(dryBox);
@@ -315,7 +276,7 @@ namespace Performish
             UpdateBenchmarkModeButtonText();
 
             foreach (var c in _actionControls) c.Enabled = true;
-            _revertButton.Enabled = false; // still needs UpdateRevertButtonState() below
+            _results.SetToolbarEnabled(true);
 
             _tweaks = new TweaksView(_services.TweakRegistry.All, _services, Enumerable.Empty<string>(), null)
             {
@@ -324,6 +285,11 @@ namespace Performish
                 Padding = new Padding(24, 12, 24, 0)
             };
             _tweaks.ReviewRequested += selection => _ = ReviewAndApplyAsync(selection);
+            _tweaks.HealthScoreRequested += OpenHealthScore;
+            _tweaks.StartupItemsRequested += OpenStartupItems;
+            _tweaks.DriftCheckRequested += () => _ = CheckForDriftAsync();
+            _tweaks.RevertRequested += () => _ = RevertEverythingAsync();
+            _tweaks.SetRevertEnabled(false); // still needs UpdateRevertButtonState() below
             _content.Controls.Add(_tweaks);
 
             _hardware = new HardwareView(_services.Hardware) { Dock = DockStyle.Fill, Visible = false };
@@ -348,8 +314,8 @@ namespace Performish
             Task.Run(() => _services.Runner.CurrentlyAppliedTweakIds().Count)
                 .ContinueWith(t =>
                 {
-                    if (IsDisposed) return;
-                    BeginInvoke((Action)(() => _revertButton.Enabled = !t.IsFaulted && t.Result > 0));
+                    if (IsDisposed || _tweaks == null) return;
+                    BeginInvoke((Action)(() => _tweaks.SetRevertEnabled(!t.IsFaulted && t.Result > 0)));
                 }, TaskScheduler.Default);
         }
 
@@ -456,19 +422,13 @@ namespace Performish
         {
             foreach (var c in _actionControls) c.Enabled = !busy;
             _tweaks?.SetBusy(busy);
+            _results?.SetToolbarEnabled(!busy);
             // The blanket enable above would incorrectly re-enable "Revert everything" even when
             // nothing is applied - re-derive its real state immediately after.
             if (!busy) UpdateRevertButtonState();
         }
 
         // ---- Tweak browser / presets --------------------------------------------------------------
-
-        private void OpenBrowser(TweakCategory? category)
-        {
-            if (_tweaks == null) return;
-            _tweaks.ShowCategory(category);
-            ShowView(ViewKind.Tweaks);
-        }
 
         private void OpenStartupItems()
         {
@@ -519,9 +479,9 @@ namespace Performish
         private void UpdateBenchmarkModeButtonText()
         {
             var options = BuildBenchmarkOptions();
-            _benchmarkModeButton.Text = _settings.BenchmarkModeDefault == BenchmarkMode.Off
+            _results.SetBenchmarkModeText(_settings.BenchmarkModeDefault == BenchmarkMode.Off
                 ? "Benchmark: Off"
-                : $"Benchmark: {_settings.BenchmarkModeDefault} (~{BenchmarkSuiteRunner.EstimateSeconds(options):0}s)";
+                : $"Benchmark: {_settings.BenchmarkModeDefault} (~{BenchmarkSuiteRunner.EstimateSeconds(options):0}s)");
         }
 
         private BenchmarkOptions BuildBenchmarkOptions()
@@ -592,13 +552,6 @@ namespace Performish
             using var dialog = new BenchmarkHistoryForm(_services.BenchmarkHistory.ReadRecent(200));
             if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedPair != null)
                 ShowBenchmarkComparisonDialog(dialog.SelectedPair.Value.Older, dialog.SelectedPair.Value.Newer);
-        }
-
-        private void OpenPresetPicker()
-        {
-            if (_tweaks == null) return;
-            ShowView(ViewKind.Tweaks);
-            _tweaks.FocusPresets();
         }
 
         /// <summary>The in-window confirmation card (see ConfirmOverlay). Danger styling when the action
